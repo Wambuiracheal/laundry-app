@@ -1,0 +1,125 @@
+// This is your Prisma schema file
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+model User {
+  id            String         @id @default(uuid())
+  first_name    String
+  last_name     String
+  email         String         @unique
+  phone         String
+  password_hash String
+  role          String         // customer | admin | rider | staff
+  orders        Order[]        @relation("UserOrders")
+  reviews       Review[]
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  assignedOrders Order[]       @relation("AssignedRiderOrders")
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token_hash String   @unique
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id])
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+}
+
+
+model Service {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  price_type  String?     // per_kg | per_item | fixed
+  base_price  Decimal?
+  orderItems  OrderItem[]
+  created_at  DateTime    @default(now())
+}
+
+
+model Order {
+  id                String      @id @default(uuid())
+  user_id           String
+  user              User        @relation("UserOrders", fields: [user_id], references: [id])
+  pickup_address    String
+  pickup_lat        Float?
+  pickup_lng        Float?
+  pickup_time       DateTime?
+  delivery_time     DateTime?
+  status            String
+  deposit_amount    Decimal?
+  total_amount      Decimal?
+  remaining_amount  Decimal?
+  payment_status    String      // pending | partial | paid
+  assigned_rider_id String?
+  assignedRider     User?       @relation("AssignedRiderOrders", fields: [assigned_rider_id], references: [id])
+  orderItems        OrderItem[]
+  payments          Payment[]
+  statusHistory     OrderStatusHistory[]
+  reviews           Review[]
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+}
+
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  order_id   String
+  order      Order    @relation(fields: [order_id], references: [id])
+  service_id String
+  service    Service  @relation(fields: [service_id], references: [id])
+  quantity   Int      @default(1)
+  price      Decimal?
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  order_id       String
+  order          Order    @relation(fields: [order_id], references: [id])
+  amount         Decimal
+  payment_method String   // mpesa | card | cash
+  transaction_id String?
+  status         String
+  created_at     DateTime @default(now())
+  transaction    Transaction?
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  payment_id     String?  @unique
+  payment        Payment? @relation(fields: [payment_id], references: [id])
+  mpesa_ref_no   String?
+  amount         Decimal
+  type           String   // credit | debit
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(uuid())
+  order_id   String
+  order      Order    @relation(fields: [order_id], references: [id])
+  status     String
+  changed_by String   // admin/rider
+  timestamp  DateTime @default(now())
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  order_id   String
+  order      Order    @relation(fields: [order_id], references: [id])
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id])
+  rating     Int
+  comment    String?
+  created_at DateTime @default(now())
+}
