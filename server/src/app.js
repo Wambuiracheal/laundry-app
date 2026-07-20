@@ -12,6 +12,7 @@ const transactionRoutes = require('./routes/transactions');
 const orderStatusHistoryRoutes = require('./routes/order-status-history');
 const reviewRoutes = require('./routes/reviews');
 const userRoutes = require('./routes/users');
+const actionsRoutes = require('./routes/actions');
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/order-status-history', orderStatusHistoryRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/actions', actionsRoutes);
 
 app.get('/', (req, res) => {
   res.send('Laundry API is running!');
