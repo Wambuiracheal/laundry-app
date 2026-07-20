@@ -1,6 +1,8 @@
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
+const fs = require('node:fs');
+const path = require('node:path');
 const { createSessionStore, publishEvent } = require('./utils/redis');
 
 const serviceRoutes = require('./routes/services');
@@ -64,5 +66,17 @@ app.post('/api/redis/publish', async (req, res) => {
     });
   }
 });
+
+const clientOutPath = path.resolve(__dirname, '../../client/out');
+const clientIndexFile = path.join(clientOutPath, 'index.html');
+const hasStaticClientBuild = fs.existsSync(clientIndexFile);
+
+if (process.env.NODE_ENV === 'production' && hasStaticClientBuild) {
+  app.use(express.static(clientOutPath));
+
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(clientIndexFile);
+  });
+}
 
 module.exports = app;
