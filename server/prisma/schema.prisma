@@ -123,3 +123,40 @@ model Review {
   comment    String?
   created_at DateTime @default(now())
 }
+
+model SupportTicket {
+  id         String   @id @default(uuid())
+  full_name  String
+  email      String
+  order_ref  String?
+  message    String
+  status     String   @default("received")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model PasswordResetRequest {
+  id         String   @id @default(uuid())
+  email      String
+  status     String   @default("accepted")
+  created_at DateTime @default(now())
+}
+
+model PickupRescheduleRequest {
+  id          String   @id @default(uuid())
+  pickup_date DateTime
+  time_window String
+  note        String?
+  status      String   @default("updated")
+  created_at  DateTime @default(now())
+}
+
+model CancellationRequest {
+  id           String   @id @default(uuid())
+  request_type String   // pickup | order
+  reason       String
+  details      String
+  acknowledged Boolean  @default(false)
+  status       String   @default("received")
+  created_at   DateTime @default(now())
+}
