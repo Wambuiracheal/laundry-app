@@ -4,6 +4,13 @@ const nacl = require("tweetnacl");
 const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
 const { PrismaClient } = require('@prisma/client');
+const {
+  validateSignupRequest,
+  validateLoginRequest,
+  validateTokenIssueRequest,
+  validateVerifyTokenRequest,
+  validateRefreshTokenRequest,
+} = require('../middlewares/validator');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -19,22 +26,6 @@ const REFRESH_TOKEN_EXPIRES_DAYS = 7;
 const keyPair = nacl.sign.keyPair(); 
 const privateKey = Buffer.from(keyPair.secretKey);
 const publicKey = Buffer.from(keyPair.publicKey);
-
-// email validation regex
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-// phone number validation regex (simple)
-const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-
-// validate email format and phone number format
-const validateEmailAndPhone = (email, phone) => {
-  if (!emailRegex.test(email)) {
-    throw new Error("Invalid email format");
-  }
-  if (phone && !phoneRegex.test(phone)) {
-    throw new Error("Invalid phone number format");
-  }
-};
 
 
 const signAccessToken = (userId, role) =>
@@ -66,14 +57,18 @@ const revokeRefreshToken = async (raw) => {
 };
 
 // --- 1. Signup & Issue Token ---
-router.post("/signup", async (req, res) => {
+router.post("/signup", validateSignupRequest, async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role } = req.body;
-
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
+    // Validation middleware already normalized and verified these fields.
+    const {
+      fullName,
+      email,
+      password,
+      phone,
+      role,
+    } = req.validatedSignup;
+    const [firstName, ...lastNameParts] = fullName.split(' ');
+    const lastName = lastNameParts.join(' ');
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -84,12 +79,11 @@ router.post("/signup", async (req, res) => {
         first_name: firstName,
         last_name: lastName,
         email: email,
+        phone: phone,
         password_hash: hashedPassword,
+        role: role,
       },
     });
-
-    // validate email format and phone number format
-    validateEmailAndPhone(email, null);
 
     const accessToken = await signAccessToken(newUser.id, role || "user");
     const refreshToken = await createRefreshToken(newUser.id);
@@ -98,7 +92,7 @@ router.post("/signup", async (req, res) => {
       message: "User created",
       accessToken,
       refreshToken,
-      user: { id: newUser.id, email: newUser.email },
+      user: { id: newUser.id, fullName, email: newUser.email },
     });
 
   } catch (err) {
@@ -111,16 +105,10 @@ router.post("/signup", async (req, res) => {
 });
 
 // Login route 
-router.post("/login", async (req, res) => {
+router.post("/login", validateLoginRequest, async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
-    // Validate email format and phone number format
-    validateEmailAndPhone(email, null);
+    // Pull only middleware-validated credentials.
+    const { email, password } = req.validatedLogin;
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -144,14 +132,12 @@ router.post("/login", async (req, res) => {
 });
 
 // --- 2. Manual Token Generation (for testing) ---
-router.post("/token", async (req, res) => {
+router.post("/token", validateTokenIssueRequest, async (req, res) => {
   try {
-    const { userId, role } = req.body;
-
-    if (!userId) return res.status(400).json({ error: "userId is required" });
+    const { userId, role } = req.validatedTokenIssue;
 
     const token = await V2.sign(
-      { userId, role: role || "user" }, 
+      { userId, role }, 
       privateKey, 
       {
         issuer: "my-app",
@@ -166,10 +152,9 @@ router.post("/token", async (req, res) => {
 });
 
 // --- 3. Verify Token ---
-router.post("/verify", async (req, res) => {
+router.post("/verify", validateVerifyTokenRequest, async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "No token provided" });
+    const { token } = req.validatedVerifyToken;
 
     const payload = await V2.verify(token, publicKey, {
       issuer: "my-app",
@@ -185,10 +170,9 @@ router.post("/verify", async (req, res) => {
 
 
 // --- 4. Refresh Access Token ---
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", validateRefreshTokenRequest, async (req, res) => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ error: "refreshToken is required" });
+    const { refreshToken } = req.validatedRefreshToken;
 
     const hash = crypto.createHash("sha256").update(refreshToken).digest("hex");
 
@@ -201,7 +185,7 @@ router.post("/refresh", async (req, res) => {
       return res.status(401).json({ error: "Invalid or expired refresh token" });
     }
 
-    // Rotate: revoke old, issue new
+    // Rotate refresh tokens to reduce replay risk.
     await prisma.refreshToken.update({
       where: { id: stored.id },
       data: { revoked: true },
@@ -218,10 +202,9 @@ router.post("/refresh", async (req, res) => {
 });
 
 // --- 5. Logout (revoke refresh token) ---
-router.post("/logout", async (req, res) => {
+router.post("/logout", validateRefreshTokenRequest, async (req, res) => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ error: "refreshToken is required" });
+    const { refreshToken } = req.validatedRefreshToken;
 
     await revokeRefreshToken(refreshToken);
     res.json({ message: "Logged out successfully" });
@@ -229,6 +212,23 @@ router.post("/logout", async (req, res) => {
     console.error("Logout failed:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Fallback for unknown auth endpoints under this router mount.
+router.use((req, res) => {
+  res.status(404).json({
+    error: "Auth route not found",
+    method: req.method,
+    path: `${req.baseUrl}${req.path}`,
+    availableEndpoints: [
+      "POST /signup",
+      "POST /login",
+      "POST /token",
+      "POST /verify",
+      "POST /refresh",
+      "POST /logout",
+    ],
+  });
 });
 
 module.exports = router;

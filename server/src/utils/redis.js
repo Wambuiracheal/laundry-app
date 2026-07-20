@@ -1,5 +1,6 @@
 const { createClient } = require('redis');
-const RedisStore = require('connect-redis').default || require('connect-redis');
+// FIX 1: Use named destructuring required by connect-redis v8/v9
+const { RedisStore } = require('connect-redis');
 
 let redisClient = null;
 let subscriberClient = null;
@@ -11,22 +12,19 @@ async function initRedis() {
     return redisClient;
   }
 
-// Check for Redis configuration in environment variables
+  // Check for Redis configuration in environment variables
   const redisUrl = process.env.REDIS_URL || null;
   const redisHost = process.env.REDIS_HOST;
-  const redisPort = Number(process.env.REDIS_PORT);
+  const redisPort = process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined;
 
-//  IF Redis URL is provided, use it; otherwise, use host and port
-  redisClient = createClient({
-    url: redisUrl,
-    socket: {
-      host: redisHost,
-      port: redisPort,
-    },
-  });
+  // FIX 2: Only pass socket host/port if REDIS_URL is NOT provided
+  const clientOptions = redisUrl
+    ? { url: redisUrl }
+    : { socket: { host: redisHost, port: redisPort } };
 
-//   Handle Redis client events
+  redisClient = createClient(clientOptions);
 
+  // Handle Redis client events
   redisClient.on('error', (err) => {
     console.error('Redis client error:', err.message);
     redisReady = false;
@@ -41,11 +39,9 @@ async function initRedis() {
     console.log('Redis client ready');
   });
 
-//   Connect to Redis server
+  // Connect to Redis server
   try {
     await redisClient.connect();
-
-    // Subscribe to a test channel to verify Redis is working
   } catch (error) {
     console.warn('Redis unavailable, continuing without cache:', error.message);
     redisReady = false;
