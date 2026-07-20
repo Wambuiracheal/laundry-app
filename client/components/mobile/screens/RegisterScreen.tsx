@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { toast } from "sonner";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/mobile/icons";
 import { MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
     FormField,
     formControlClass,
@@ -36,6 +36,7 @@ export function RegisterScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const toast = useToast();
 
     function setField(field: keyof RegisterValues, value: string) {
         setValues((prev) => ({ ...prev, [field]: value }));

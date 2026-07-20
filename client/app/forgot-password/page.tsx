@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
   formControlClass,
 } from "@/components/shared/form/FormField";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type ForgotPasswordValues,
@@ -23,6 +23,7 @@ export default function ForgotPasswordPage() {
   const [values, setValues] = useState<ForgotPasswordValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<ForgotPasswordValues>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();

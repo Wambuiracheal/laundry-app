@@ -12,6 +12,41 @@ const keyPair = nacl.sign.keyPair();
 const privateKey = Buffer.from(keyPair.secretKey);
 const publicKey = Buffer.from(keyPair.publicKey);
 
+const GOOGLE_LOGIN_URL = process.env.GOOGLE_LOGIN_URL;
+const GOOGLE_SIGNUP_URL = process.env.GOOGLE_SIGNUP_URL;
+
+function isAllowedRedirectUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === "https:") {
+      return true;
+    }
+
+    return parsed.protocol === "http:" && parsed.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+function redirectToGoogle(res, redirectUrl, flow) {
+  if (!redirectUrl) {
+    return res.status(501).json({
+      error: "Google auth is not configured",
+      flow,
+      requiredEnv: flow === "login" ? "GOOGLE_LOGIN_URL" : "GOOGLE_SIGNUP_URL",
+    });
+  }
+
+  if (!isAllowedRedirectUrl(redirectUrl)) {
+    return res.status(500).json({
+      error: "Invalid Google auth redirect URL configuration",
+      flow,
+    });
+  }
+
+  return res.redirect(302, redirectUrl);
+}
+
 const signAccessToken = (userId, role) =>
   V2.sign({ userId, role }, privateKey, {
     issuer: "my-app",
@@ -180,6 +215,14 @@ async function logout(req, res) {
   }
 }
 
+function googleLogin(req, res) {
+  return redirectToGoogle(res, GOOGLE_LOGIN_URL, "login");
+}
+
+function googleSignup(req, res) {
+  return redirectToGoogle(res, GOOGLE_SIGNUP_URL, "signup");
+}
+
 module.exports = {
   signup,
   login,
@@ -187,4 +230,6 @@ module.exports = {
   verifyToken,
   refreshAccessToken,
   logout,
+  googleLogin,
+  googleSignup,
 };

@@ -13,10 +13,14 @@ const {
   verifyToken,
   refreshAccessToken,
   logout,
+  googleLogin,
+  googleSignup,
 } = require('../controllers/authController');
 
 const router = express.Router();
 
+router.get('/login/google', googleLogin);
+router.get('/signup/google', googleSignup);
 router.post('/signup', validateSignupRequest, signup);
 router.post('/login', validateLoginRequest, login);
 router.post('/token', validateTokenIssueRequest, issueToken);
@@ -31,6 +35,8 @@ router.use((req, res) => {
     method: req.method,
     path: `${req.baseUrl}${req.path}`,
     availableEndpoints: [
+      "GET /login/google",
+      "GET /signup/google",
       "POST /signup",
       "POST /login",
       "POST /token",

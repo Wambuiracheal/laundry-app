@@ -3,9 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { toast } from "sonner";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/mobile/icons";
 import { MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
     FormField,
     iconInputWrapperClass,
@@ -28,6 +28,7 @@ export function LoginScreen() {
     const [errors, setErrors] = useState<LoginErrors>({});
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const toast = useToast();
 
     function setField(field: keyof LoginValues, value: string) {
         setValues((prev) => ({ ...prev, [field]: value }));

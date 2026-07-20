@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type CancellationValues,
@@ -46,6 +46,7 @@ export function CancellationForm({
   const [values, setValues] = useState<CancellationValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<CancellationValues>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
