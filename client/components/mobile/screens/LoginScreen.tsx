@@ -3,11 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import { toast } from "sonner";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/mobile/icons";
 import { MobileLayout, SoftCard } from "@/components/mobile/primitives";
 import {
     FormField,
-    FormStatusMessage,
     iconInputWrapperClass,
 } from "@/components/shared/form/FormField";
 import { getGoogleLoginUrl, login } from "@/utils/authApi";
@@ -26,7 +26,6 @@ function handleGoogleLogin() {
 export function LoginScreen() {
     const [values, setValues] = useState<LoginValues>(initialValues);
     const [errors, setErrors] = useState<LoginErrors>({});
-    const [status, setStatus] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,18 +42,17 @@ export function LoginScreen() {
         setErrors(nextErrors);
 
         if (hasLoginErrors(nextErrors)) {
-            setStatus(null);
+            toast.error("Please fix the highlighted form errors.");
             return;
         }
 
         try {
             setIsSubmitting(true);
-            setStatus(null);
             const result = await login(values);
-            setStatus(result.message || "Login successful.");
+            toast.success(result.message || "Login successful.");
         } catch (error) {
             const message = error instanceof Error ? error.message : "Login failed.";
-            setStatus(message);
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -197,8 +195,6 @@ export function LoginScreen() {
                                 Apple
                             </button>
                         </div>
-
-                        {status ? <FormStatusMessage message={status} /> : null}
                     </form>
                 </SoftCard>
             </div>

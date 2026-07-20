@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 
 export async function postJson<TResponse>(path: string, payload: unknown): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {

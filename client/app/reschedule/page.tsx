@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
-  FormStatusMessage,
   formControlClass,
   formSelectClass,
   formTextareaClass,
@@ -28,7 +28,6 @@ const windows = ["08:00 AM - 10:00 AM", "10:00 AM - 12:00 PM", "02:00 PM - 04:00
 export default function ReschedulePage() {
   const [values, setValues] = useState<RescheduleValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<RescheduleValues>>({});
-  const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const minDate = useMemo(() => {
@@ -39,26 +38,25 @@ export default function ReschedulePage() {
     return `${year}-${month}-${day}`;
   }, []);
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateRescheduleForm(values);
     setErrors(nextErrors);
 
     if (hasErrors(nextErrors)) {
-      setStatus(null);
+      toast.error("Please fix the highlighted form errors.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatus(null);
-      await postJson("/api/actions/reschedule", values);
-      setStatus("Pickup rescheduled successfully.");
+      await postJson("/actions/reschedule", values);
+      toast.success("Pickup rescheduled successfully.");
       setValues(initialValues);
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to reschedule pickup.";
-      setStatus(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -131,8 +129,6 @@ export default function ReschedulePage() {
         >
           {isSubmitting ? "Saving..." : "Save Changes"}
         </button>
-
-        {status ? <FormStatusMessage message={status} /> : null}
       </form>
     </ActionFormLayout>
   );
