@@ -1,6 +1,6 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { getCachedValue, cacheValue } = require('../lib/redis');
+const { getCachedValue, cacheValue } = require('../utils/redis');
 const router = express.Router();
 const prisma = new PrismaClient();
 
