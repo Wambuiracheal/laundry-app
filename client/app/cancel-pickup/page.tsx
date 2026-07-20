@@ -9,7 +9,7 @@ export default function CancelPickupPage() {
       backHref="/dark-dashboard"
       backLabel="Back to Dark Dashboard"
       successMessage="Pickup cancellation request received."
-      endpoint="/api/actions/cancel-pickup"
+      endpoint="/actions/cancel-pickup"
     />
   );
 }

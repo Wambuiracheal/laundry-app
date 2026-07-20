@@ -9,7 +9,7 @@ export default function CancelOrderPage() {
       backHref="/order-tracking"
       backLabel="Back to Order Tracking"
       successMessage="Order cancellation request submitted."
-      endpoint="/api/actions/cancel-order"
+      endpoint="/actions/cancel-order"
     />
   );
 }
