@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
@@ -9,6 +8,7 @@ import {
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type FormErrors,
@@ -29,6 +29,7 @@ export default function ReschedulePage() {
   const [values, setValues] = useState<RescheduleValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<RescheduleValues>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   const minDate = useMemo(() => {
     const today = new Date();
