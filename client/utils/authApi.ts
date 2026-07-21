@@ -1,10 +1,15 @@
-import { postJson } from "@/utils/apiClient";
+import { API_BASE_URL, postJson } from "@/utils/apiClient";
 import type { LoginValues } from "@/utils/loginValidation";
 import type { RegisterValues } from "@/utils/registerValidation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/auth/login/google";
 const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/auth/signup/google";
+
+if (!process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH || !process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH) {
+  console.warn(
+    "Environment variables NEXT_PUBLIC_GOOGLE_LOGIN_PATH and NEXT_PUBLIC_GOOGLE_SIGNUP_PATH are not set. Using default paths."
+  );
+}
 
 export type AuthResponse = {
   message: string;

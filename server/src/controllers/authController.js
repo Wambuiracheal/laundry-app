@@ -2,15 +2,50 @@ const { V2 } = require("paseto");
 const nacl = require("tweetnacl");
 const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("../utils/prisma");
 
-const prisma = new PrismaClient();
+const REFRESH_TOKEN_EXPIRES_DAYS = 7; 
 
-const REFRESH_TOKEN_EXPIRES_DAYS = 7;
+function parseKeyFromEnv(rawValue, expectedLength, label) {
+  if (!rawValue) {
+    return null;
+  }
 
-const keyPair = nacl.sign.keyPair();
-const privateKey = Buffer.from(keyPair.secretKey);
-const publicKey = Buffer.from(keyPair.publicKey);
+  try {
+    const key = Buffer.from(rawValue, "base64");
+    if (key.length !== expectedLength) {
+      throw new Error(`${label} must decode to ${expectedLength} bytes`);
+    }
+
+    return key;
+  } catch (error) {
+    throw new Error(`Invalid ${label}: ${error.message}`);
+  }
+}
+
+function resolvePasetoKeys() {
+  const envPrivateKey = parseKeyFromEnv(process.env.PASETO_PRIVATE_KEY, 64, "PASETO_PRIVATE_KEY");
+  const envPublicKey = parseKeyFromEnv(process.env.PASETO_PUBLIC_KEY, 32, "PASETO_PUBLIC_KEY");
+
+  if (envPrivateKey && envPublicKey) {
+    return { privateKey: envPrivateKey, publicKey: envPublicKey };
+  }
+
+  if (envPrivateKey || envPublicKey) {
+    throw new Error("Both PASETO_PRIVATE_KEY and PASETO_PUBLIC_KEY are required together");
+  }
+
+  // SECURITY WARNING:
+  // Ephemeral keys rotate on every restart, invalidating existing access tokens.
+  // Configure PASETO_PRIVATE_KEY and PASETO_PUBLIC_KEY in production to keep tokens stable.
+  const keyPair = nacl.sign.keyPair();
+  return {
+    privateKey: Buffer.from(keyPair.secretKey),
+    publicKey: Buffer.from(keyPair.publicKey),
+  };
+}
+
+const { privateKey, publicKey } = resolvePasetoKeys();
 
 const GOOGLE_LOGIN_URL = process.env.GOOGLE_LOGIN_URL;
 const GOOGLE_SIGNUP_URL = process.env.GOOGLE_SIGNUP_URL;
@@ -47,8 +82,8 @@ function redirectToGoogle(res, redirectUrl, flow) {
   return res.redirect(302, redirectUrl);
 }
 
-const signAccessToken = (userId, role) =>
-  V2.sign({ userId, role }, privateKey, {
+const signAccessToken = (user) =>
+  V2.sign({ userId: user.id, role: user.role, fullName: user.fullName, email: user.email }, privateKey, {
     issuer: "my-app",
     audience: "users",
     expiresIn: "1h",
@@ -94,14 +129,14 @@ async function signup(req, res) {
       },
     });
 
-    const accessToken = await signAccessToken(newUser.id, role || "user");
+    const accessToken = await signAccessToken(newUser);
     const refreshToken = await createRefreshToken(newUser.id);
 
     return res.status(201).json({
       message: "User created",
       accessToken,
       refreshToken,
-      user: { id: newUser.id, fullName, email: newUser.email },
+    //   user: { id: newUser.id, fullName, email: newUser.email },      
     });
   } catch (err) {
     if (err.code === "P2002") {
@@ -127,7 +162,7 @@ async function login(req, res) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const accessToken = await signAccessToken(user.id, user.role || "user");
+    const accessToken = await signAccessToken(user);
     const refreshToken = await createRefreshToken(user.id);
 
     return res.json({ accessToken, refreshToken });
@@ -193,7 +228,7 @@ async function refreshAccessToken(req, res) {
       data: { revoked: true },
     });
 
-    const accessToken = await signAccessToken(stored.user.id, stored.user.role || "user");
+    const accessToken = await signAccessToken(stored.user);
     const newRefreshToken = await createRefreshToken(stored.user.id);
 
     return res.json({ accessToken, refreshToken: newRefreshToken });
