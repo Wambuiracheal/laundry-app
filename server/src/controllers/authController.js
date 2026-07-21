@@ -130,8 +130,7 @@ async function signup(req, res) {
 
     const newUser = await prisma.user.create({
       data: {
-        first_name: firstName,
-        last_name: lastName,
+        fullName: `${firstName} ${lastName}`,
         email,
         phone,
         password_hash: hashedPassword,
