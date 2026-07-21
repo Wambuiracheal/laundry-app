@@ -1,10 +1,15 @@
-import { postJson } from "@/utils/apiClient";
+import { API_BASE_URL, postJson } from "@/utils/apiClient";
 import type { LoginValues } from "@/utils/loginValidation";
 import type { RegisterValues } from "@/utils/registerValidation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
-const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/api/auth/login/google";
-const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/api/auth/signup/google";
+const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/auth/login/google";
+const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/auth/signup/google";
+
+if (!process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH || !process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH) {
+  console.warn(
+    "Environment variables NEXT_PUBLIC_GOOGLE_LOGIN_PATH and NEXT_PUBLIC_GOOGLE_SIGNUP_PATH are not set. Using default paths."
+  );
+}
 
 export type AuthResponse = {
   message: string;
@@ -18,14 +23,14 @@ export type AuthResponse = {
 };
 
 export async function login(payload: LoginValues): Promise<AuthResponse> {
-  return postJson<AuthResponse>("/api/auth/login", {
+  return postJson<AuthResponse>("/auth/login", {
     email: payload.email,
     password: payload.password,
   });
 }
 
 export async function signup(payload: RegisterValues): Promise<AuthResponse> {
-  return postJson<AuthResponse>("/api/auth/signup", {
+  return postJson<AuthResponse>("/auth/signup", {
     fullName: payload.fullName,
     email: payload.email,
     phone: payload.phone,

@@ -4,7 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { initRedis } = require('./src/utils/redis');
 
 const prisma = new PrismaClient();
-const PORT = process.env.BE_PORT || 5000;
+const PORT = Number(process.env.PORT || process.env.BE_PORT || 5000);
 
 async function startServer() {
   try {

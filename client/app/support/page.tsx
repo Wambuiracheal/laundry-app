@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
-  FormStatusMessage,
   formControlClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type FormErrors,
@@ -26,29 +26,28 @@ const initialValues: SupportFormValues = {
 export default function SupportPage() {
   const [values, setValues] = useState<SupportFormValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<SupportFormValues>>({});
-  const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateSupportForm(values);
     setErrors(nextErrors);
 
     if (hasErrors(nextErrors)) {
-      setStatus(null);
+      toast.error("Please fix the highlighted form errors.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatus(null);
-      await postJson("/api/actions/support", values);
-      setStatus("Ticket submitted. We will respond shortly.");
+      await postJson("/actions/support", values);
+      toast.success("Ticket submitted. We will respond shortly.");
       setValues(initialValues);
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit support ticket.";
-      setStatus(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -127,8 +126,6 @@ export default function SupportPage() {
         >
           {isSubmitting ? "Submitting..." : "Submit Ticket"}
         </button>
-
-        {status ? <FormStatusMessage message={status} /> : null}
       </form>
     </ActionFormLayout>
   );

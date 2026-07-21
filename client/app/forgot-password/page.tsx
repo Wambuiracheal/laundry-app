@@ -4,9 +4,9 @@ import { useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
-  FormStatusMessage,
   formControlClass,
 } from "@/components/shared/form/FormField";
+import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type ForgotPasswordValues,
@@ -22,29 +22,28 @@ const initialValues: ForgotPasswordValues = {
 export default function ForgotPasswordPage() {
   const [values, setValues] = useState<ForgotPasswordValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<ForgotPasswordValues>>({});
-  const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateForgotPassword(values);
     setErrors(nextErrors);
 
     if (hasErrors(nextErrors)) {
-      setStatus(null);
+      toast.error("Please fix the highlighted form errors.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatus(null);
-      await postJson("/api/actions/forgot-password", values);
-      setStatus("Reset instructions sent to your email.");
+      await postJson("/actions/forgot-password", values);
+      toast.success("Reset instructions sent to your email.");
       setValues(initialValues);
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to request password reset.";
-      setStatus(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -80,8 +79,6 @@ export default function ForgotPasswordPage() {
         >
           {isSubmitting ? "Sending..." : "Send Reset Link"}
         </button>
-
-        {status ? <FormStatusMessage message={status} /> : null}
       </form>
     </ActionFormLayout>
   );
