@@ -6,6 +6,7 @@ const prisma = require("../utils/prisma");
 
 const REFRESH_TOKEN_EXPIRES_DAYS = 7; 
 
+// Helper function to parse base64-encoded keys from environment variables and validate their length.
 function parseKeyFromEnv(rawValue, expectedLength, label) {
   if (!rawValue) {
     return null;
@@ -23,6 +24,7 @@ function parseKeyFromEnv(rawValue, expectedLength, label) {
   }
 }
 
+// Resolve PASETO keys from environment variables or generate ephemeral keys if not provided.
 function resolvePasetoKeys() {
   const envPrivateKey = parseKeyFromEnv(process.env.PASETO_PRIVATE_KEY, 64, "PASETO_PRIVATE_KEY");
   const envPublicKey = parseKeyFromEnv(process.env.PASETO_PUBLIC_KEY, 32, "PASETO_PUBLIC_KEY");
@@ -45,11 +47,14 @@ function resolvePasetoKeys() {
   };
 }
 
+// Resolve PASETO keys from environment variables or generate ephemeral keys if not provided.
 const { privateKey, publicKey } = resolvePasetoKeys();
 
+// Google OAuth login and signup URLs are configured via environment variables.
 const GOOGLE_LOGIN_URL = process.env.GOOGLE_LOGIN_URL;
 const GOOGLE_SIGNUP_URL = process.env.GOOGLE_SIGNUP_URL;
 
+// Helper function to check if a given URL is allowed for redirection (must be HTTPS or localhost HTTP).
 function isAllowedRedirectUrl(rawUrl) {
   try {
     const parsed = new URL(rawUrl);
@@ -63,6 +68,7 @@ function isAllowedRedirectUrl(rawUrl) {
   }
 }
 
+// Helper function to redirect users to Google OAuth login or signup URLs, ensuring the URLs are valid and secure.
 function redirectToGoogle(res, redirectUrl, flow) {
   if (!redirectUrl) {
     return res.status(501).json({
@@ -82,6 +88,7 @@ function redirectToGoogle(res, redirectUrl, flow) {
   return res.redirect(302, redirectUrl);
 }
 
+// SIGNIN ACCESS TOKEN AND REFRESH TOKEN MANAGEMENT
 const signAccessToken = (user) =>
   V2.sign({ userId: user.id, role: user.role, fullName: user.fullName, email: user.email }, privateKey, {
     issuer: "my-app",
@@ -89,6 +96,7 @@ const signAccessToken = (user) =>
     expiresIn: "1h",
   });
 
+// REFRESH TOKEN MANAGEMENT
 const createRefreshToken = async (userId) => {
   const raw = crypto.randomBytes(40).toString("hex");
   const hash = crypto.createHash("sha256").update(raw).digest("hex");
@@ -102,6 +110,7 @@ const createRefreshToken = async (userId) => {
   return raw;
 };
 
+// Revoke refresh token by hashing the raw token and marking it as revoked in the database.
 const revokeRefreshToken = async (raw) => {
   const hash = crypto.createHash("sha256").update(raw).digest("hex");
   await prisma.refreshToken.updateMany({
@@ -110,6 +119,7 @@ const revokeRefreshToken = async (raw) => {
   });
 };
 
+// Sign and verify tokens using PASETO V2 with Ed25519 keys, and manage refresh tokens in the database.
 async function signup(req, res) {
   try {
     const { fullName, email, password, phone, role } = req.validatedSignup;
@@ -148,6 +158,7 @@ async function signup(req, res) {
   }
 }
 
+// Login, token issuance, verification, refresh, and logout functions follow similar patterns, using PASETO for access tokens and database-stored refresh tokens.
 async function login(req, res) {
   try {
     const { email, password } = req.validatedLogin;
@@ -172,6 +183,7 @@ async function login(req, res) {
   }
 }
 
+// Token issuance, verification, refresh, and logout functions follow similar patterns, using PASETO for access tokens and database-stored refresh tokens.
 async function issueToken(req, res) {
   try {
     const { userId, role } = req.validatedTokenIssue;
@@ -192,6 +204,7 @@ async function issueToken(req, res) {
   }
 }
 
+// verifyToken, refreshAccessToken, and logout functions follow similar patterns, using PASETO for access tokens and database-stored refresh tokens.
 async function verifyToken(req, res) {
   try {
     const { token } = req.validatedVerifyToken;
@@ -208,6 +221,7 @@ async function verifyToken(req, res) {
   }
 }
 
+// refreshAccessToken and logout functions follow similar patterns, using PASETO for access tokens and database-stored refresh tokens.
 async function refreshAccessToken(req, res) {
   try {
     const { refreshToken } = req.validatedRefreshToken;
@@ -238,6 +252,7 @@ async function refreshAccessToken(req, res) {
   }
 }
 
+// logout function follows similar patterns, using PASETO for access tokens and database-stored refresh tokens.
 async function logout(req, res) {
   try {
     const { refreshToken } = req.validatedRefreshToken;
@@ -250,14 +265,17 @@ async function logout(req, res) {
   }
 }
 
+// Google OAuth login and signup functions redirect users to the configured Google auth URLs, ensuring they are valid and secure.
 function googleLogin(req, res) {
   return redirectToGoogle(res, GOOGLE_LOGIN_URL, "login");
 }
 
+// Google OAuth login and signup functions redirect users to the configured Google auth URLs, ensuring they are valid and secure.
 function googleSignup(req, res) {
   return redirectToGoogle(res, GOOGLE_SIGNUP_URL, "signup");
 }
 
+// Export all authentication-related functions.
 module.exports = {
   signup,
   login,
