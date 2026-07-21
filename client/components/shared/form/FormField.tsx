@@ -14,7 +14,7 @@ type FormFieldProps = {
   placeholder?: string;
 };
 
-export function FormField({ htmlFor, label, info, error, children, placeholder }: FormFieldProps) {
+export function FormField({ htmlFor, label, info, error, children, placeholder }: Readonly<FormFieldProps>) {
   return (
     <div>
       <label className="mb-1 block text-sm font-semibold text-slate-700" htmlFor={htmlFor}>
@@ -26,9 +26,4 @@ export function FormField({ htmlFor, label, info, error, children, placeholder }
       {placeholder ? <p className="mt-1 text-xs text-slate-400">{placeholder}</p> : null}
     </div>
   );
-}
-
-export function FormStatusMessage({ message }: { message: string }) {
-  const isError = /(failed|required|invalid|error)/i.test(message);
-  return <p className={`text-sm font-semibold ${isError ? "text-rose-700" : "text-emerald-700"}`}>{message}</p>;
 }

@@ -1,6 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 function isBlank(value) {
   return typeof value !== "string" || value.trim().length === 0;
