@@ -1,7 +1,16 @@
+const crypto = require("node:crypto");
+const bcrypt = require("bcrypt");
 const prisma = require("../utils/prisma");
+
+const RESET_TOKEN_EXPIRES_MINUTES = 60;
+const GENERIC_RESET_MESSAGE = "If an account exists for that email, password reset instructions have been sent.";
 
 function isBlank(value) {
   return typeof value !== "string" || value.trim().length === 0;
+}
+
+function hashToken(rawToken) {
+  return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 
 async function submitSupportTicket(req, res) {
@@ -40,19 +49,69 @@ async function requestPasswordReset(req, res) {
       return res.status(400).json({ error: "email is required." });
     }
 
-    const resetRequest = await prisma.passwordResetRequest.create({
-      data: {
-        email: email.trim().toLowerCase(),
-      },
-    });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
-    return res.status(200).json({
-      requestId: resetRequest.id,
-      status: resetRequest.status,
-      message: "If the account exists, reset instructions have been queued.",
-    });
+    // Always respond the same way whether or not the account exists, so callers
+    // can't use this endpoint to enumerate registered emails.
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000);
+
+      await prisma.passwordResetRequest.create({
+        data: {
+          email: normalizedEmail,
+          user_id: user.id,
+          token_hash: hashToken(rawToken),
+          expires_at: expiresAt,
+          status: "pending",
+        },
+      });
+
+      const resetLink = `${process.env.CLIENT_URL ?? "http://localhost:3000"}/reset-password?token=${rawToken}`;
+      // No email provider is wired up yet — log the link so it can be used manually
+      // during development. Replace this line with a real send when one is added.
+      console.log("[password-reset] link for", normalizedEmail, "->", resetLink);
+    }
+
+    return res.status(200).json({ message: GENERIC_RESET_MESSAGE });
   } catch (error) {
     return res.status(500).json({ error: "Failed to request password reset", details: error.message });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.validatedResetPassword;
+
+    const resetRequest = await prisma.passwordResetRequest.findUnique({
+      where: { token_hash: hashToken(token) },
+    });
+
+    if (!resetRequest || resetRequest.used || !resetRequest.expires_at || resetRequest.expires_at < new Date()) {
+      return res.status(400).json({ error: "Invalid or expired reset link." });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetRequest.user_id },
+        data: { password_hash: hashedPassword },
+      }),
+      prisma.passwordResetRequest.update({
+        where: { id: resetRequest.id },
+        data: { used: true, status: "used" },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { user_id: resetRequest.user_id, revoked: false },
+        data: { revoked: true },
+      }),
+    ]);
+
+    return res.status(200).json({ message: "Password updated. You can now log in with your new password." });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to reset password", details: error.message });
   }
 }
 
@@ -144,6 +203,7 @@ async function cancelOrder(req, res) {
 module.exports = {
   submitSupportTicket,
   requestPasswordReset,
+  resetPassword,
   reschedulePickup,
   cancelPickup,
   cancelOrder,

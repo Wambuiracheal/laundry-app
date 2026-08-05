@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { serviceItems } from "@/components/mobile/data";
+import { useEffect, useMemo, useState } from "react";
 import {
   BackIcon,
   BellIcon,
@@ -13,29 +13,40 @@ import {
   ServiceIcon,
   HomeIcon,
 } from "@/components/mobile/icons";
-import { Badge, MobileBottomNav, MobileHeader, MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { Badge, MobileBottomNav, MobileHeader, MobileLayout } from "@/components/mobile/primitives";
 import { validateServiceSelection } from "@/utils/serviceSelectionValidation";
+import { formatServicePrice, getServiceDisplay } from "@/utils/serviceDisplay";
+import { listServices, type Service } from "@/utils/servicesApi";
 
 type QtyMap = Record<string, number>;
 
-const toneStyles = {
-  blue: {
-    icon: "bg-blue-100 text-blue-700",
-    action: "bg-blue-700 text-white",
-  },
-  green: {
-    icon: "bg-emerald-100 text-emerald-700",
-    action: "bg-emerald-700 text-white",
-  },
-  amber: {
-    icon: "bg-amber-100 text-amber-700",
-    action: "bg-amber-700 text-white",
-  },
-} as const;
+const UNIT_LABEL: Record<string, string> = {
+  per_kg: "Priced per kg",
+  per_item: "Priced per item",
+  per_pair: "Priced per pair",
+};
 
 export function NewOrderScreen() {
+  const [services, setServices] = useState<Service[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [qty, setQty] = useState<QtyMap>({});
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listServices()
+      .then((result) => {
+        if (!cancelled) setServices(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Failed to load services.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const totalItems = useMemo(() => Object.values(qty).reduce((sum, value) => sum + value, 0), [qty]);
 
@@ -90,49 +101,66 @@ export function NewOrderScreen() {
       <h1 className="text-4xl font-semibold tracking-tight">Select Services</h1>
       <p className="mt-2 text-xl text-slate-600">Choose the items you need help with. We&apos;ll handle the rest with care.</p>
 
-      <section className="mt-5 space-y-3.5">
-        {serviceItems.map((item) => {
-          const count = qty[item.id] ?? 0;
-          const style = toneStyles[item.tone];
+      {loadError ? (
+        <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{loadError}</div>
+      ) : null}
 
-          return (
-            <SoftCard key={item.id}>
-              <div className="flex items-start gap-3">
-                <div className={`rounded-xl p-3 ${style.icon}`}>
-                  <ServiceIcon className="h-6 w-6" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-[34px] font-semibold leading-tight">{item.name}</h2>
-                  <p className="mt-1 text-xl leading-7 text-slate-600">{item.description}</p>
-                  <p className="mt-1 text-[32px] font-semibold text-blue-700">{item.priceLabel}</p>
-                </div>
-              </div>
+      <section className="mt-5 space-y-4">
+        {services === null ? (
+          <p className="py-6 text-center text-slate-500">Loading services…</p>
+        ) : services.length === 0 ? (
+          <p className="py-6 text-center text-slate-500">No services are available right now.</p>
+        ) : (
+          services.map((service, index) => {
+            const count = qty[service.id] ?? 0;
+            const display = getServiceDisplay(service.name, index);
 
-              <div className="mt-3 flex items-center justify-between">
-                <div className="flex items-center gap-2 rounded-full bg-slate-50 px-2 py-1">
-                  <button
-                    className="rounded-full border border-slate-200 bg-white p-1 text-blue-700"
-                    type="button"
-                    onClick={() => removeItem(item.id)}
-                    aria-label={`Reduce ${item.name}`}
-                  >
-                    <MinusIcon className="h-4 w-4" />
-                  </button>
-                  <span className="w-6 text-center text-xl">{count}</span>
-                  <button
-                    className={`rounded-full p-1 ${style.action}`}
-                    type="button"
-                    onClick={() => addItem(item.id)}
-                    aria-label={`Increase ${item.name}`}
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                  </button>
+            return (
+              <article key={service.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                <div className="relative h-40 w-full" style={{ background: display.accent }}>
+                  {display.imageSrc ? (
+                    <Image src={display.imageSrc} alt={service.name} fill className="object-cover" />
+                  ) : null}
+                  <span className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-lg font-semibold text-blue-700 shadow-sm backdrop-blur">
+                    {formatServicePrice(service)}
+                  </span>
                 </div>
-                <span className="text-xl text-slate-500">{item.tag}</span>
-              </div>
-            </SoftCard>
-          );
-        })}
+
+                <div className="p-4">
+                  <h2 className="text-2xl font-semibold leading-tight">{service.name}</h2>
+                  {service.description ? (
+                    <p className="mt-1 text-lg leading-6 text-slate-600">{service.description}</p>
+                  ) : null}
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 rounded-full bg-slate-50 px-2 py-1">
+                      <button
+                        className="rounded-full border border-slate-200 bg-white p-1 text-blue-700"
+                        type="button"
+                        onClick={() => removeItem(service.id)}
+                        aria-label={`Reduce ${service.name}`}
+                      >
+                        <MinusIcon className="h-4 w-4" />
+                      </button>
+                      <span className="w-6 text-center text-xl">{count}</span>
+                      <button
+                        className="rounded-full bg-blue-700 p-1 text-white"
+                        type="button"
+                        onClick={() => addItem(service.id)}
+                        aria-label={`Increase ${service.name}`}
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {service.price_type ? (
+                      <span className="text-sm font-medium text-slate-500">{UNIT_LABEL[service.price_type] ?? service.price_type}</span>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        )}
       </section>
 
       <div className="fixed bottom-[74px] left-1/2 z-10 w-full max-w-[390px] -translate-x-1/2 px-4">

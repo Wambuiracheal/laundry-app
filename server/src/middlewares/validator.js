@@ -114,6 +114,29 @@ const validateRefreshTokenRequest = (req, res, next) => {
   return next();
 };
 
+const validateResetPasswordRequest = (req, res, next) => {
+  try {
+    const token = req.body.token;
+    const password = req.body.password;
+    const confirmPassword = req.body.confirmPassword;
+
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({ error: 'token, password and confirmPassword are required' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    validatePasswordStrength(password);
+
+    req.validatedResetPassword = { token, password };
+    return next();
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   validateEmailAndPhone,
   validatePasswordStrength,
@@ -122,4 +145,5 @@ module.exports = {
   validateTokenIssueRequest,
   validateVerifyTokenRequest,
   validateRefreshTokenRequest,
+  validateResetPasswordRequest,
 };

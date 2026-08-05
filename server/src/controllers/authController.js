@@ -90,10 +90,26 @@ function redirectToGoogle(res, redirectUrl, flow) {
 
 // SIGNIN ACCESS TOKEN AND REFRESH TOKEN MANAGEMENT
 const signAccessToken = (user) =>
-  V2.sign({ userId: user.id, role: user.role, fullName: user.fullName, email: user.email }, privateKey, {
+  V2.sign(
+    {
+      userId: user.id,
+      role: user.role,
+      fullName: `${user.first_name} ${user.last_name}`.trim(),
+      email: user.email,
+    },
+    privateKey,
+    {
+      issuer: "my-app",
+      audience: "users",
+      expiresIn: "1h",
+    }
+  );
+
+// Shared verifier for the requireAuth middleware, mirrors verifyToken's checks.
+const verifyAccessToken = (token) =>
+  V2.verify(token, publicKey, {
     issuer: "my-app",
     audience: "users",
-    expiresIn: "1h",
   });
 
 // REFRESH TOKEN MANAGEMENT
@@ -130,7 +146,8 @@ async function signup(req, res) {
 
     const newUser = await prisma.user.create({
       data: {
-        fullName: `${firstName} ${lastName}`,
+        first_name: firstName,
+        last_name: lastName,
         email,
         phone,
         password_hash: hashedPassword,
@@ -284,4 +301,5 @@ module.exports = {
   logout,
   googleLogin,
   googleSignup,
+  verifyAccessToken,
 };
