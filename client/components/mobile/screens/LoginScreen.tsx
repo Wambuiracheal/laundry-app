@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/mobile/icons";
 import { MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { useAuth } from "@/components/shared/auth/AuthProvider";
 import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
     FormField,
     iconInputWrapperClass,
 } from "@/components/shared/form/FormField";
-import { getGoogleLoginUrl, login } from "@/utils/authApi";
+import { getGoogleLoginUrl } from "@/utils/authApi";
 import { hasLoginErrors, type LoginErrors, type LoginValues, validateLogin } from "@/utils/loginValidation";
 import logo from "@/public/mobile/logo.png";
 
@@ -29,6 +31,8 @@ export function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const toast = useToast();
+    const { login } = useAuth();
+    const router = useRouter();
 
     function setField(field: keyof LoginValues, value: string) {
         setValues((prev) => ({ ...prev, [field]: value }));
@@ -49,8 +53,9 @@ export function LoginScreen() {
 
         try {
             setIsSubmitting(true);
-            const result = await login(values);
-            toast.success(result.message || "Login successful.");
+            await login(values);
+            toast.success("Login successful.");
+            router.push("/customer-dashboard");
         } catch (error) {
             const message = error instanceof Error ? error.message : "Login failed.";
             toast.error(message);

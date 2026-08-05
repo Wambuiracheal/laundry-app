@@ -1,6 +1,7 @@
-import { API_BASE_URL, postJson } from "@/utils/apiClient";
+import { API_BASE_URL, getJson, postJson } from "@/utils/apiClient";
 import type { LoginValues } from "@/utils/loginValidation";
 import type { RegisterValues } from "@/utils/registerValidation";
+import type { SessionUser } from "@/utils/session";
 
 const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/auth/login/google";
 const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/auth/signup/google";
@@ -46,4 +47,16 @@ export function getGoogleSignupUrl(): string {
 
 export function getGoogleLoginUrl(): string {
   return `${API_BASE_URL}${GOOGLE_LOGIN_PATH}`;
+}
+
+export async function getMe(accessToken: string): Promise<SessionUser> {
+  return getJson<SessionUser>("/users/me", accessToken);
+}
+
+export async function logout(refreshToken: string): Promise<{ message: string }> {
+  return postJson<{ message: string }>("/auth/logout", { refreshToken });
+}
+
+export async function resetPassword(token: string, password: string, confirmPassword: string): Promise<{ message: string }> {
+  return postJson<{ message: string }>("/actions/reset-password", { token, password, confirmPassword });
 }

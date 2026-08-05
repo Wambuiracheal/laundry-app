@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/mobile/icons";
 import { MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { useAuth } from "@/components/shared/auth/AuthProvider";
 import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
     FormField,
@@ -13,7 +15,7 @@ import {
     iconInputWrapperClass,
 } from "@/components/shared/form/FormField";
 import logo from "@/public/mobile/logo.png";
-import { getGoogleSignupUrl, signup } from "@/utils/authApi";
+import { getGoogleSignupUrl } from "@/utils/authApi";
 import {
     hasRegisterErrors,
     type RegisterErrors,
@@ -37,6 +39,8 @@ export function RegisterScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const toast = useToast();
+    const { signup } = useAuth();
+    const router = useRouter();
 
     function setField(field: keyof RegisterValues, value: string) {
         setValues((prev) => ({ ...prev, [field]: value }));
@@ -58,11 +62,10 @@ export function RegisterScreen() {
         try {
             setIsSubmitting(true);
 
-            const result = await signup(values);
+            await signup(values);
 
-            toast.success(result.message || "Account created successfully. You can now log in.");
-            setValues(initialValues);
-            setErrors({});
+            toast.success("Account created successfully.");
+            router.push("/customer-dashboard");
         } catch (error) {
             const message = error instanceof Error ? error.message : "Signup failed.";
             toast.error(message);
