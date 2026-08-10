@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
+import { AuthLayout } from "@/components/shared/auth/AuthLayout";
 import { EyeIcon, EyeOffIcon, LockIcon } from "@/components/mobile/icons";
 import { FormField, iconInputWrapperClass } from "@/components/shared/form/FormField";
 import { useToast } from "@/components/shared/toast/ToastProvider";
@@ -125,16 +126,18 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <ActionFormLayout
-      eyebrow="Auth"
-      title="Reset Password"
-      description="Choose a new password for your account."
-      backHref="/login"
-      backLabel="Back to Login"
-    >
-      <Suspense fallback={null}>
-        <ResetPasswordForm />
-      </Suspense>
-    </ActionFormLayout>
+    <AuthLayout>
+      <ActionFormLayout
+        eyebrow="Auth"
+        title="Reset Password"
+        description="Choose a new password for your account."
+        backHref="/login"
+        backLabel="Back to Login"
+      >
+        <Suspense fallback={null}>
+          <ResetPasswordForm />
+        </Suspense>
+      </ActionFormLayout>
+    </AuthLayout>
   );
 }

@@ -1,5 +1,10 @@
+import { AuthLayout } from "@/components/shared/auth/AuthLayout";
 import { RegisterScreen } from "@/components/mobile/screens/RegisterScreen";
 
 export default function RegisterPage() {
-  return <RegisterScreen />;
+  return (
+    <AuthLayout>
+      <RegisterScreen />
+    </AuthLayout>
+  );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BellIcon, HomeIcon, OrdersIcon, ProfileIcon, ServiceIcon } from "@/components/mobile/icons";
+import { BellIcon, HomeIcon, LogoutIcon, OrdersIcon, ProfileIcon, ServiceIcon } from "@/components/mobile/icons";
 import { ServiceCard } from "@/components/landing/ui";
 import { Sidebar, StatCard, StatusBadge, WebLayout } from "@/components/web/primitives";
 import { useAuth } from "@/components/shared/auth/AuthProvider";
@@ -27,7 +27,7 @@ function primaryServiceLabel(order: Order): string {
 }
 
 export function DashboardScreen() {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, logout } = useAuth();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [services, setServices] = useState<Service[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +76,8 @@ export function DashboardScreen() {
             { label: "Home", icon: <HomeIcon className="h-5 w-5" />, href: "/customer-dashboard", active: true },
             { label: "Services", icon: <ServiceIcon className="h-5 w-5" />, href: "/new-order" },
             { label: "Orders", icon: <OrdersIcon className="h-5 w-5" />, href: "/order-tracking" },
-            { label: "Profile", icon: <ProfileIcon className="h-5 w-5" />, href: "/login" },
+            { label: "Profile", icon: <ProfileIcon className="h-5 w-5" />, href: "/profile" },
+            { label: "Logout", icon: <LogoutIcon className="h-5 w-5" />, href: "/login", onClick: logout },
           ]}
         />
       }

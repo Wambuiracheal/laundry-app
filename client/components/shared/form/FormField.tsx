@@ -20,7 +20,7 @@ export function FormField({ htmlFor, label, info, error, children, placeholder }
       <label className="mb-1 block text-sm font-semibold text-slate-700" htmlFor={htmlFor}>
         {label}
       </label>
-      {info ? <p className="mb-2 text-xs text-slate-500">{info}</p> : null}
+      {info ? <p className="mb-1 text-xs text-slate-500">{info}</p> : null}
       {children}
       {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
       {placeholder ? <p className="mt-1 text-xs text-slate-400">{placeholder}</p> : null}

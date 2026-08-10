@@ -65,24 +65,24 @@ export function LoginScreen() {
     }
 
     return (
-        <MobileLayout>
-            <div className="pt-20">
+        <MobileLayout bottomNav={false}>
+            <div>
                 <SoftCard>
-                    <div className="mb-6 space-y-2">
+                    <div className="mb-3 space-y-1">
                         {/* image */}
                         <div>
-                            <Image src={logo} alt="Welcome Back" className="h-16 w-16 rounded-full mx-auto" />
+                            <Image src={logo} alt="Welcome Back" className="h-10 w-10 rounded-full mx-auto" />
                         </div>
 
                         {/* title and subtitle */}
-                        <div className="text-center mb-2">
-                            <h1 className="mb-1 text-xl font-semibold">Welcome Back!!!</h1>
-                            <p className="text-slate-500 text-sm">Please login to your account</p>
+                        <div className="text-center mb-1">
+                            <h1 className="mb-0.5 text-lg font-semibold">Welcome Back!!!</h1>
+                            <p className="text-slate-500 text-xs">Please login to your account</p>
                         </div>
                     </div>
 
                     {/* form */}
-                    <form className="space-y-4" onSubmit={submit} noValidate>
+                    <form className="space-y-3" onSubmit={submit} noValidate>
                         <FormField
                             htmlFor="email"
                             label="Email Address"
@@ -140,23 +140,21 @@ export function LoginScreen() {
                         </div>
 
                         <button
-                            className="w-full rounded-lg bg-blue-800 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            className="w-full rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                             type="submit"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? "Logging in..." : "Login"}
                         </button>
 
-                        <div>
-                            <p className="text-center text-xs text-slate-500">
-                                Don&apos;t have an account?{" "}
-                                <Link href="/register" className="font-base text-xs text-blue-700">
-                                    Sign Up
-                                </Link>
-                            </p>
-                        </div>
+                        <p className="text-center text-xs text-slate-500">
+                            Don&apos;t have an account?{" "}
+                            <Link href="/register" className="font-base text-xs text-blue-700">
+                                Sign Up
+                            </Link>
+                        </p>
 
-                        <div className="flex items-center gap-2 text-slate-400 my-4">
+                        <div className="flex items-center gap-2 text-slate-400 my-1">
                             <hr className="flex-1 border-slate-300" />
                             <span className="text-xs">OR CONTINUE WITH</span>
                             <hr className="flex-1 border-slate-300" />

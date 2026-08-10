@@ -75,20 +75,20 @@ export function RegisterScreen() {
     }
 
     return (
-        <MobileLayout>
-            <div className="pt-12">
+        <MobileLayout bottomNav={false}>
+            <div>
                 <SoftCard>
-                    <div className="mb-6 space-y-2">
+                    <div className="mb-2 space-y-0.5">
                         <div>
-                            <Image src={logo} alt="Create Account" className="h-16 w-16 rounded-full mx-auto" />
+                            <Image src={logo} alt="Create Account" className="h-9 w-9 rounded-full mx-auto" />
                         </div>
-                        <div className="text-center mb-2">
-                            <h1 className="mb-1 text-xl font-semibold">Create Account</h1>
-                            <p className="text-slate-500 text-sm">Set up your Panda Laundry profile</p>
+                        <div className="text-center mb-1">
+                            <h1 className="mb-0.5 text-lg font-semibold">Create Account</h1>
+                            <p className="text-slate-500 text-xs">Set up your Panda Laundry profile</p>
                         </div>
                     </div>
 
-                    <form className="space-y-4" onSubmit={submit} noValidate>
+                    <form className="space-y-2.5" onSubmit={submit} noValidate>
                         {/* fullname */}
                         <FormField
                             htmlFor="fullName"
@@ -128,7 +128,7 @@ export function RegisterScreen() {
                         <FormField
                             htmlFor="phone"
                             label="Phone"
-                            info="Add phone number with country code. e.g +2547XXXXXXXX"
+                            info="e.g. +2547XXXXXXXX"
                             error={errors.phone}
                         >
                             <input
@@ -144,7 +144,7 @@ export function RegisterScreen() {
                         <FormField
                             htmlFor="password"
                             label="Password"
-                            info="Use a strong password of upto 8 digits, including letters and numbers."
+                            info="At least 8 characters, with letters & numbers."
                             error={errors.password}
                         >
                             <div className={iconInputWrapperClass}>
@@ -220,14 +220,14 @@ export function RegisterScreen() {
                         </FormField>
 
                         <button
-                            className="w-full rounded-lg bg-blue-800 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 mt-2"
+                            className="w-full rounded-lg bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                             type="submit"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? "Creating Account..." : "Sign Up"}
                         </button>
 
-                                      <div className="flex items-center gap-2 text-slate-400 my-4">
+                        <div className="flex items-center gap-2 text-slate-400 my-1">
                             <hr className="flex-1 border-slate-300" />
                             <span className="text-xs">OR CONTINUE WITH</span>
                             <hr className="flex-1 border-slate-300" />
