@@ -1,5 +1,6 @@
 import { BellIcon, HomeIcon, OrdersIcon, PlusIcon, ProfileIcon, ServiceIcon } from "@/components/mobile/icons";
 import { Badge, MobileBottomNav, MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import Image from "next/image";
 import Link from "next/link";
 
 export function CustomerDashboardScreen() {
@@ -7,7 +8,9 @@ export function CustomerDashboardScreen() {
     <MobileLayout>
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-[linear-gradient(140deg,#bae6fd,#93c5fd)]" />
+          <div className="h-10 w-10 overflow-hidden rounded-full bg-[linear-gradient(140deg,#bae6fd,#93c5fd)]">
+            <Image src="/mobile/logo.png" alt="Panda Laundry" width={40} height={40} className="h-full w-full object-cover" />
+          </div>
           <p className="text-2xl font-semibold text-blue-700">Panda Laundry</p>
         </div>
         <BellIcon className="h-6 w-6 text-slate-500" />

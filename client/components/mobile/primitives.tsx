@@ -4,12 +4,13 @@ import Link from "next/link";
 type MobileLayoutProps = {
   children: ReactNode;
   dark?: boolean;
+  bottomNav?: boolean;
 };
 
-export function MobileLayout({ children, dark = false }: MobileLayoutProps) {
+export function MobileLayout({ children, dark = false, bottomNav = true }: MobileLayoutProps) {
   return (
     <main
-      className={`mx-auto min-h-screen w-full max-w-[390px] px-4 pb-28 pt-5 ${
+      className={`mx-auto w-full max-w-[390px] px-4 pt-5 ${bottomNav ? "min-h-screen pb-28" : "pb-5"} ${
         dark ? "bg-[#091525] text-slate-100" : "bg-slate-100 text-slate-900"
       }`}
     >

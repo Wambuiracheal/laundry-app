@@ -6,6 +6,7 @@ export type SidebarNavItem = {
   icon: ReactNode;
   href: string;
   active?: boolean;
+  onClick?: () => void;
 };
 
 export function WebLayout({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
@@ -41,6 +42,14 @@ export function Sidebar({
             <li key={item.label}>
               <Link
                 href={item.href}
+                onClick={
+                  item.onClick
+                    ? (event) => {
+                        event.preventDefault();
+                        item.onClick?.();
+                      }
+                    : undefined
+                }
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   item.active ? "bg-emerald-300/70 text-emerald-900" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                 }`}

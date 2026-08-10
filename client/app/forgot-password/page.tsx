@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
+import { AuthLayout } from "@/components/shared/auth/AuthLayout";
 import {
   FormField,
   formControlClass,
@@ -50,36 +51,38 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <ActionFormLayout
-      eyebrow="Auth"
-      title="Forgot Password"
-      description="Enter your email to receive password reset instructions."
-      backHref="/login"
-      backLabel="Back to Login"
-    >
-      <form className="space-y-4" onSubmit={submit} noValidate>
-        <FormField
-          htmlFor="email"
-          label="Email Address"
-          info="We will send a reset link if this account exists."
-          error={errors.email}
-        >
-          <input
-            id="email"
-            className={formControlClass}
-            value={values.email}
-            onChange={(event) => setValues({ email: event.target.value })}
-          />
-        </FormField>
+    <AuthLayout>
+      <ActionFormLayout
+        eyebrow="Auth"
+        title="Forgot Password"
+        description="Enter your email to receive password reset instructions."
+        backHref="/login"
+        backLabel="Back to Login"
+      >
+        <form className="space-y-4" onSubmit={submit} noValidate>
+          <FormField
+            htmlFor="email"
+            label="Email Address"
+            info="We will send a reset link if this account exists."
+            error={errors.email}
+          >
+            <input
+              id="email"
+              className={formControlClass}
+              value={values.email}
+              onChange={(event) => setValues({ email: event.target.value })}
+            />
+          </FormField>
 
-        <button
-          className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-          type="submit"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Sending..." : "Send Reset Link"}
-        </button>
-      </form>
-    </ActionFormLayout>
+          <button
+            className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Sending..." : "Send Reset Link"}
+          </button>
+        </form>
+      </ActionFormLayout>
+    </AuthLayout>
   );
 }
