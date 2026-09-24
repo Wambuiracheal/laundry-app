@@ -6,6 +6,7 @@ import {
   FormField,
   FormStatusMessage,
   formControlClass,
+  submitButtonClass,
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
@@ -125,7 +126,7 @@ export default function ReschedulePage() {
         </FormField>
 
         <button
-          className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className={submitButtonClass}
           type="submit"
           disabled={isSubmitting}
         >
