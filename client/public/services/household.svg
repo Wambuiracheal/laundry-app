@@ -1,0 +1,15 @@
+<svg width="320" height="180" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="180" fill="#FEF3C7"/>
+  <circle cx="290" cy="150" r="80" fill="#FDE68A"/>
+  <rect y="156" width="320" height="24" fill="#FCD34D" fill-opacity="0.5"/>
+  <rect x="70" y="124" width="180" height="32" rx="12" fill="#F59E0B"/>
+  <path d="M100 124v32M140 124v32M180 124v32M220 124v32" stroke="#D97706" stroke-width="2" stroke-dasharray="4 4"/>
+  <rect x="80" y="94" width="160" height="30" rx="12" fill="#60A5FA"/>
+  <path d="M110 94v30M150 94v30M190 94v30" stroke="#3B82F6" stroke-width="2" stroke-dasharray="4 4"/>
+  <rect x="74" y="64" width="172" height="30" rx="12" fill="#F472B6"/>
+  <path d="M104 64v30M144 64v30M184 64v30M224 64v30" stroke="#EC4899" stroke-width="2" stroke-dasharray="4 4"/>
+  <path d="M104 40c0-8 8-12 16-10 16 4 64 4 80 0 8-2 16 2 16 10v10c0 8-8 12-16 10-16-4-64-4-80 0-8 2-16-2-16-10z" fill="#FFFFFF"/>
+  <path d="M130 44h60" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+  <path d="M44 40l4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="#FFFFFF"/>
+  <path d="M274 34l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" fill="#FFFFFF"/>
+</svg>

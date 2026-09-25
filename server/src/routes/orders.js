@@ -1,6 +1,5 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { requireAuth } = require('../middlewares/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -10,31 +9,12 @@ router.get('/', async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       include: {
-        user: { select: { id: true, first_name: true, last_name: true, email: true, phone: true, role: true } },
-        assignedRider: { select: { id: true, first_name: true, last_name: true, phone: true } },
+        user: true,
+        assignedRider: true,
         orderItems: true,
         payments: true,
         statusHistory: true,
         reviews: true,
-      },
-      orderBy: { created_at: 'desc' },
-    });
-    res.json(orders);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
-  }
-});
-
-// get the authenticated caller's own orders (must come before /:id)
-router.get('/me', requireAuth, async (req, res) => {
-  try {
-    const orders = await prisma.order.findMany({
-      where: { user_id: req.user.id },
-      include: {
-        orderItems: { include: { service: true } },
-        statusHistory: true,
-        payments: true,
-        assignedRider: { select: { id: true, first_name: true, last_name: true, phone: true } },
       },
       orderBy: { created_at: 'desc' },
     });
@@ -50,8 +30,8 @@ router.get('/:id', async (req, res) => {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
       include: {
-        user: { select: { id: true, first_name: true, last_name: true, email: true, phone: true, role: true } },
-        assignedRider: { select: { id: true, first_name: true, last_name: true, phone: true } },
+        user: true,
+        assignedRider: true,
         orderItems: true,
         payments: true,
         statusHistory: true,

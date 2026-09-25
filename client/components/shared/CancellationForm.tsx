@@ -4,10 +4,11 @@ import { useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
+  FormStatusMessage,
+  submitButtonClass,
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
-import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type CancellationValues,
@@ -23,7 +24,7 @@ type CancellationFormProps = {
   backHref: string;
   backLabel: string;
   successMessage: string;
-  endpoint: "/actions/cancel-pickup" | "/actions/cancel-order";
+  endpoint: "/api/actions/cancel-pickup" | "/api/actions/cancel-order";
 };
 
 const initialValues: CancellationValues = {
@@ -42,31 +43,32 @@ export function CancellationForm({
   backLabel,
   successMessage,
   endpoint,
-}: Readonly<CancellationFormProps>) {
+}: CancellationFormProps) {
   const [values, setValues] = useState<CancellationValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<CancellationValues>>({});
+  const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
 
-  async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateCancellationForm(values);
     setErrors(nextErrors);
 
     if (hasErrors(nextErrors)) {
-      toast.error("Please fix the highlighted form errors.");
+      setStatus(null);
       return;
     }
 
     try {
       setIsSubmitting(true);
+      setStatus(null);
       await postJson(endpoint, values);
-      toast.success(successMessage);
+      setStatus(successMessage);
       setValues(initialValues);
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit request.";
-      toast.error(message);
+      setStatus(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -117,23 +119,26 @@ export function CancellationForm({
           />
         </FormField>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 accent-blue-700"
             checked={values.acknowledge}
             onChange={(event) => setValues((prev) => ({ ...prev, acknowledge: event.target.checked }))}
           />
-          <span>I understand this action may not be reversible.</span>
+          I understand this action may not be reversible.
         </label>
         {errors.acknowledge ? <p className="text-xs text-rose-600">{errors.acknowledge}</p> : null}
 
         <button
-          className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className={submitButtonClass}
           type="submit"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Submitting..." : "Submit Request"}
         </button>
+
+        {status ? <FormStatusMessage message={status} /> : null}
       </form>
     </ActionFormLayout>
   );

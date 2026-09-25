@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
+  FormStatusMessage,
   formControlClass,
+  submitButtonClass,
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
-import { useToast } from "@/components/shared/toast/ToastProvider";
 import {
   hasErrors,
   type FormErrors,
@@ -28,8 +29,8 @@ const windows = ["08:00 AM - 10:00 AM", "10:00 AM - 12:00 PM", "02:00 PM - 04:00
 export default function ReschedulePage() {
   const [values, setValues] = useState<RescheduleValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors<RescheduleValues>>({});
+  const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
 
   const minDate = useMemo(() => {
     const today = new Date();
@@ -39,25 +40,26 @@ export default function ReschedulePage() {
     return `${year}-${month}-${day}`;
   }, []);
 
-  async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateRescheduleForm(values);
     setErrors(nextErrors);
 
     if (hasErrors(nextErrors)) {
-      toast.error("Please fix the highlighted form errors.");
+      setStatus(null);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await postJson("/actions/reschedule", values);
-      toast.success("Pickup rescheduled successfully.");
+      setStatus(null);
+      await postJson("/api/actions/reschedule", values);
+      setStatus("Pickup rescheduled successfully.");
       setValues(initialValues);
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to reschedule pickup.";
-      toast.error(message);
+      setStatus(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -124,12 +126,14 @@ export default function ReschedulePage() {
         </FormField>
 
         <button
-          className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className={submitButtonClass}
           type="submit"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Saving..." : "Save Changes"}
         </button>
+
+        {status ? <FormStatusMessage message={status} /> : null}
       </form>
     </ActionFormLayout>
   );

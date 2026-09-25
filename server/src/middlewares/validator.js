@@ -2,6 +2,7 @@ const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const phoneRegex = /^\+?[1-9]\d{1,14}$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
+// This function validates the email and phone number formats using regular expressions. It throws an error if the email format is invalid or if the phone number format is invalid (if provided).
 const validateEmailAndPhone = (email, phone) => {
   if (!emailRegex.test(email)) {
     throw new Error('Invalid email format');
@@ -12,12 +13,14 @@ const validateEmailAndPhone = (email, phone) => {
   }
 };
 
+// This function validates the strength of a password using a regular expression. It throws an error if the password does not meet the required criteria (at least 8 characters long, including uppercase, lowercase, number, and special character).
 const validatePasswordStrength = (password) => {
   if (!passwordRegex.test(password)) {
     throw new Error('Password must be at least 8 characters long and include uppercase, lowercase, number, and special character');
   }
 };
 
+// This middleware function validates the signup request payload. It checks for required fields, validates email and phone formats, checks password strength, and ensures that the full name contains at least two names. If validation passes, it normalizes the payload and attaches it to the request object for downstream handlers to use.
 const validateSignupRequest = (req, res, next) => {
   try {
     const fullName = req.body.fullName ?? req.body.full_name;
@@ -60,6 +63,7 @@ const validateSignupRequest = (req, res, next) => {
   }
 };
 
+// This middleware function validates the login request payload. It checks for required fields (email and password), reuses the email format validation, and attaches the validated payload to the request object for downstream handlers to use. If validation fails, it responds with a 400 status code and an error message.
 const validateLoginRequest = (req, res, next) => {
   try {
     const email = req.body.email;
@@ -79,6 +83,7 @@ const validateLoginRequest = (req, res, next) => {
   }
 };
 
+// This middleware function validates the token issue request payload. It checks for required fields (userId and role), and attaches the validated payload to the request object for downstream handlers to use. If validation fails, it responds with a 400 status code and an error message.
 const validateTokenIssueRequest = (req, res, next) => {
   const userId = req.body.userId;
   const role = req.body.role || 'user';
@@ -92,6 +97,7 @@ const validateTokenIssueRequest = (req, res, next) => {
   return next();
 };
 
+// This middleware function validates the verify token request payload. It checks for the required field (token), and attaches the validated payload to the request object for downstream handlers to use. If validation fails, it responds with a 400 status code and an error message.
 const validateVerifyTokenRequest = (req, res, next) => {
   const token = req.body.token;
 
@@ -103,6 +109,7 @@ const validateVerifyTokenRequest = (req, res, next) => {
   return next();
 };
 
+// This middleware function validates the refresh token request payload. It checks for the required field (refreshToken), and attaches the validated payload to the request object for downstream handlers to use. If validation fails, it responds with a 400 status code and an error message.
 const validateRefreshTokenRequest = (req, res, next) => {
   const refreshToken = req.body.refreshToken;
 
@@ -114,29 +121,6 @@ const validateRefreshTokenRequest = (req, res, next) => {
   return next();
 };
 
-const validateResetPasswordRequest = (req, res, next) => {
-  try {
-    const token = req.body.token;
-    const password = req.body.password;
-    const confirmPassword = req.body.confirmPassword;
-
-    if (!token || !password || !confirmPassword) {
-      return res.status(400).json({ error: 'token, password and confirmPassword are required' });
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: 'Passwords do not match' });
-    }
-
-    validatePasswordStrength(password);
-
-    req.validatedResetPassword = { token, password };
-    return next();
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
-};
-
 module.exports = {
   validateEmailAndPhone,
   validatePasswordStrength,
@@ -145,5 +129,4 @@ module.exports = {
   validateTokenIssueRequest,
   validateVerifyTokenRequest,
   validateRefreshTokenRequest,
-  validateResetPasswordRequest,
 };

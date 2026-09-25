@@ -1,36 +1,8 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { requireAuth } = require('../middlewares/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-// get the authenticated caller's own profile (must come before /:id)
-router.get('/me', requireAuth, async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        phone: true,
-        role: true,
-        created_at: true,
-        updated_at: true,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch user', details: error.message });
-  }
-});
 
 router.get('/', async (req, res) => {
   try {

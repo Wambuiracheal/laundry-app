@@ -1,16 +1,10 @@
-import { API_BASE_URL, getJson, postJson } from "@/utils/apiClient";
+import { postJson } from "@/utils/apiClient";
 import type { LoginValues } from "@/utils/loginValidation";
 import type { RegisterValues } from "@/utils/registerValidation";
-import type { SessionUser } from "@/utils/session";
 
-const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/auth/login/google";
-const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/auth/signup/google";
-
-if (!process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH || !process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH) {
-  console.warn(
-    "Environment variables NEXT_PUBLIC_GOOGLE_LOGIN_PATH and NEXT_PUBLIC_GOOGLE_SIGNUP_PATH are not set. Using default paths."
-  );
-}
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
+const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/api/auth/login/google";
+const GOOGLE_SIGNUP_PATH = process.env.NEXT_PUBLIC_GOOGLE_SIGNUP_PATH ?? "/api/auth/signup/google";
 
 export type AuthResponse = {
   message: string;
@@ -24,14 +18,14 @@ export type AuthResponse = {
 };
 
 export async function login(payload: LoginValues): Promise<AuthResponse> {
-  return postJson<AuthResponse>("/auth/login", {
+  return postJson<AuthResponse>("/api/auth/login", {
     email: payload.email,
     password: payload.password,
   });
 }
 
 export async function signup(payload: RegisterValues): Promise<AuthResponse> {
-  return postJson<AuthResponse>("/auth/signup", {
+  return postJson<AuthResponse>("/api/auth/signup", {
     fullName: payload.fullName,
     email: payload.email,
     phone: payload.phone,
@@ -47,16 +41,4 @@ export function getGoogleSignupUrl(): string {
 
 export function getGoogleLoginUrl(): string {
   return `${API_BASE_URL}${GOOGLE_LOGIN_PATH}`;
-}
-
-export async function getMe(accessToken: string): Promise<SessionUser> {
-  return getJson<SessionUser>("/users/me", accessToken);
-}
-
-export async function logout(refreshToken: string): Promise<{ message: string }> {
-  return postJson<{ message: string }>("/auth/logout", { refreshToken });
-}
-
-export async function resetPassword(token: string, password: string, confirmPassword: string): Promise<{ message: string }> {
-  return postJson<{ message: string }>("/actions/reset-password", { token, password, confirmPassword });
 }

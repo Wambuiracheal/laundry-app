@@ -9,11 +9,6 @@ export type ForgotPasswordValues = {
   email: string;
 };
 
-export type ResetPasswordValues = {
-  password: string;
-  confirmPassword: string;
-};
-
 export type RescheduleValues = {
   pickupDate: string;
   timeWindow: string;
@@ -62,28 +57,6 @@ export function validateForgotPassword(values: ForgotPasswordValues): FormErrors
 
   if (!emailRegex.test(values.email.trim())) {
     errors.email = "Enter a valid email address.";
-  }
-
-  return errors;
-}
-
-function isStrongPassword(password: string): boolean {
-  const hasLower = /[a-z]/.test(password);
-  const hasUpper = /[A-Z]/.test(password);
-  const hasDigit = /\d/.test(password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(password);
-  return password.length >= 8 && hasLower && hasUpper && hasDigit && hasSpecial;
-}
-
-export function validateResetPassword(values: ResetPasswordValues): FormErrors<ResetPasswordValues> {
-  const errors: FormErrors<ResetPasswordValues> = {};
-
-  if (!isStrongPassword(values.password)) {
-    errors.password = "Use at least 8 characters, with upper/lowercase letters, a number, and a symbol.";
-  }
-
-  if (values.confirmPassword !== values.password) {
-    errors.confirmPassword = "Passwords do not match.";
   }
 
   return errors;

@@ -136,14 +136,10 @@ model SupportTicket {
 }
 
 model PasswordResetRequest {
-  id         String    @id @default(uuid())
+  id         String   @id @default(uuid())
   email      String
-  user_id    String?
-  token_hash String?   @unique
-  expires_at DateTime?
-  used       Boolean   @default(false)
-  status     String    @default("pending")
-  created_at DateTime  @default(now())
+  status     String   @default("accepted")
+  created_at DateTime @default(now())
 }
 
 model PickupRescheduleRequest {
