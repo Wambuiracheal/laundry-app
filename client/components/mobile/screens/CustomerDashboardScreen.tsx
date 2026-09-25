@@ -1,103 +1,111 @@
-import { BellIcon, HomeIcon, OrdersIcon, PlusIcon, ProfileIcon, ServiceIcon } from "@/components/mobile/icons";
-import { Badge, MobileBottomNav, MobileLayout, SoftCard } from "@/components/mobile/primitives";
+import { OrdersIcon, PlusIcon } from "@/components/mobile/icons";
+import { FirstName } from "@/components/mobile/SessionUser";
+import { AppShell, Badge, PageHeading, SectionHeader, SoftCard, primaryButtonClass } from "@/components/mobile/primitives";
+import Image from "next/image";
 import Link from "next/link";
+import { serviceItems } from "@/components/mobile/data";
+
+const recentOrders = [
+  { id: "#8821", service: "Dry Cleaning", detail: "4 items", amount: "$32.50", status: "Processing", tone: "green" },
+  { id: "#8819", service: "Wash & Fold", detail: "8 kg", amount: "$18.00", status: "Out for delivery", tone: "blue" },
+] as const;
+
+const popularServices = serviceItems.filter((item) => ["wash-fold", "dry-clean", "iron-only", "shoes"].includes(item.id));
 
 export function CustomerDashboardScreen() {
   return (
-    <MobileLayout>
-      <header className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-[linear-gradient(140deg,#bae6fd,#93c5fd)]" />
-          <p className="text-2xl font-semibold text-blue-700">Panda Laundry</p>
+    <AppShell active="home">
+      <PageHeading
+        title={
+          <>
+            Hello, <FirstName />!
+          </>
+        }
+        subtitle="Your laundry is our priority today."
+        action={
+          <Link href="/new-order" className={`${primaryButtonClass} max-sm:hidden`}>
+            <PlusIcon className="h-4 w-4" />
+            New Order
+          </Link>
+        }
+      />
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4">
+        <div className="col-span-2 rounded-2xl bg-[linear-gradient(140deg,#2563eb,#1d4ed8_55%,#1e40af)] p-4 text-white shadow-lg shadow-blue-700/20 md:col-span-1 lg:p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-100">Next pickup</p>
+          <p className="mt-1 text-lg font-semibold lg:text-xl">Tomorrow, 09:00 AM</p>
+          <span className="mt-3 inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-xs">Home (Primary)</span>
         </div>
-        <BellIcon className="h-6 w-6 text-slate-500" />
-      </header>
-
-      <section>
-        <h1 className="text-5xl font-semibold tracking-tight">Hello, Sarah!</h1>
-        <p className="mt-2 text-xl text-slate-600">Your laundry is our priority today.</p>
-      </section>
-
-      <section className="mt-5 rounded-2xl bg-blue-700 p-4 text-white shadow-[0_12px_26px_rgba(29,78,216,0.35)]">
-        <p className="text-sm tracking-wide text-blue-100">NEXT PICKUP</p>
-        <p className="mt-1 text-3xl font-semibold">Tomorrow, 09:00 AM</p>
-        <div className="mt-2 inline-flex rounded-full bg-blue-500/70 px-3 py-1 text-base">Home (Primary)</div>
-      </section>
-
-      <section className="mt-3.5 grid grid-cols-2 gap-3">
-        <SoftCard>
-          <p className="text-lg text-slate-600">Active Orders</p>
-          <p className="mt-2 text-2xl font-semibold text-blue-700">02 Ongoing</p>
+        <SoftCard className="lg:p-5">
+          <p className="text-xs font-medium text-slate-500">Active orders</p>
+          <p className="mt-1 text-xl font-semibold text-slate-900 lg:text-2xl">2</p>
+          <p className="text-xs text-blue-700">ongoing</p>
         </SoftCard>
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-300/85 p-4 shadow-[0_8px_20px_rgba(16,185,129,0.18)]">
-          <p className="text-lg text-emerald-900">Panda Points</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-900">450 pts</p>
-        </section>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 lg:p-5">
+          <p className="text-xs font-medium text-emerald-800">Panda points</p>
+          <p className="mt-1 text-xl font-semibold text-emerald-900 lg:text-2xl">450</p>
+          <p className="text-xs text-emerald-700">pts available</p>
+        </div>
       </section>
 
-      <Link href="/new-order" className="mt-5 block w-full rounded-2xl bg-blue-700 px-4 py-3 text-center text-xl font-semibold text-white">
+      <Link href="/new-order" className={`${primaryButtonClass} mt-4 w-full sm:hidden`}>
+        <PlusIcon className="h-4 w-4" />
         New Order
       </Link>
 
-      <section className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-3xl font-semibold">Recent Orders</h2>
-          <Link href="/order-tracking" className="text-lg font-semibold text-blue-700">
-            View All
-          </Link>
-        </div>
-
-        <div className="space-y-3">
-          <SoftCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-semibold">Order #8821</p>
-                <p className="text-lg text-slate-600">Dry Cleaning • 4 items</p>
-              </div>
-              <Badge text="PROCESSING" tone="green" />
-            </div>
-            <p className="mt-2 text-right text-2xl">$32.50</p>
-          </SoftCard>
-
-          <SoftCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-semibold">Order #8819</p>
-                <p className="text-lg text-slate-600">Wash & Fold • 8kg</p>
-              </div>
-              <Badge text="OUT FOR DELIVERY" tone="blue" />
-            </div>
-            <p className="mt-2 text-right text-2xl">$18.00</p>
-          </SoftCard>
-        </div>
-      </section>
-
-      <section className="mt-6 grid grid-cols-2 gap-3">
-        <section className="h-36 rounded-2xl bg-[linear-gradient(140deg,#d1d5db,#6b7280)] p-3 text-white">
-          <p className="mt-12 text-2xl font-semibold">Premium Wash</p>
-          <p className="text-lg">From $2.50/kg</p>
+      <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+        <section>
+          <SectionHeader title="Recent orders" href="/order-tracking" />
+          <div className="space-y-2.5">
+            {recentOrders.map((order) => (
+              <Link key={order.id} href="/order-tracking" className="block">
+                <SoftCard className="flex items-center gap-3 transition hover:border-slate-300">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                    <OrdersIcon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">Order {order.id}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {order.service} · {order.detail}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-sm font-semibold">{order.amount}</p>
+                    <Badge text={order.status} tone={order.tone} />
+                  </div>
+                </SoftCard>
+              </Link>
+            ))}
+          </div>
         </section>
-        <section className="h-36 rounded-2xl bg-[linear-gradient(140deg,#d6d3d1,#78716c)] p-3 text-white">
-          <p className="mt-12 text-2xl font-semibold">Ironing</p>
-          <p className="text-lg">From $1.00/pc</p>
+
+        <section>
+          <SectionHeader title="Popular services" href="/new-order" linkLabel="Browse" />
+          <div className="grid grid-cols-2 gap-3">
+            {popularServices.map((service) => (
+              <Link
+                key={service.id}
+                href="/new-order"
+                className="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition hover:border-slate-300"
+              >
+                <div className="relative h-20 overflow-hidden">
+                  <Image
+                    src={service.image}
+                    alt=""
+                    fill
+                    sizes="200px"
+                    className="object-cover transition duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-semibold">{service.name}</p>
+                  <p className="text-xs text-slate-500">From {service.priceLabel}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </section>
-      </section>
-
-      <Link
-        href="/new-order"
-        className="fixed bottom-24 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-blue-700 text-white"
-      >
-        <PlusIcon className="h-6 w-6" />
-      </Link>
-
-      <MobileBottomNav
-        items={[
-          { label: "Home", icon: <HomeIcon className="h-5 w-5" />, active: true, href: "/customer-dashboard" },
-          { label: "Services", icon: <ServiceIcon className="h-5 w-5" />, href: "/new-order" },
-          { label: "Orders", icon: <OrdersIcon className="h-5 w-5" />, href: "/order-tracking" },
-          { label: "Profile", icon: <ProfileIcon className="h-5 w-5" />, href: "/login" },
-        ]}
-      />
-    </MobileLayout>
+      </div>
+    </AppShell>
   );
 }

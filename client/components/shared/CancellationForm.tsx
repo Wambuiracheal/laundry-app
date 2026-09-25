@@ -5,6 +5,7 @@ import { ActionFormLayout } from "@/components/shared/ActionFormLayout";
 import {
   FormField,
   FormStatusMessage,
+  submitButtonClass,
   formSelectClass,
   formTextareaClass,
 } from "@/components/shared/form/FormField";
@@ -118,9 +119,10 @@ export function CancellationForm({
           />
         </FormField>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 accent-blue-700"
             checked={values.acknowledge}
             onChange={(event) => setValues((prev) => ({ ...prev, acknowledge: event.target.checked }))}
           />
@@ -129,7 +131,7 @@ export function CancellationForm({
         {errors.acknowledge ? <p className="text-xs text-rose-600">{errors.acknowledge}</p> : null}
 
         <button
-          className="w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className={submitButtonClass}
           type="submit"
           disabled={isSubmitting}
         >
