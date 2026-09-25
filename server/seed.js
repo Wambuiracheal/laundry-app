@@ -12,7 +12,7 @@ async function main() {
       { name: 'Ironing Only', pricePerKg: 3.00 },
     ],
   });
-  console.log('✅ Success! Database seeded.');
+  console.log(' Success! Database seeded.');
 }
 
 main()
