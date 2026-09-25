@@ -7,6 +7,7 @@ import {
   type BookingFormErrors,
   type BookingFormValues,
 } from "@/utils/bookingValidation";
+import { formControlClass, submitButtonClass } from "@/components/shared/form/FormField";
 
 type BookingModalProps = {
   open: boolean;
@@ -73,27 +74,33 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 md:items-center">
-      <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-slate-900">Book Pickup</h2>
+          <div>
+            <h2 id="booking-title" className="text-lg font-semibold text-slate-900">Book a pickup</h2>
+            <p className="text-xs text-slate-500">We&apos;ll confirm your slot by SMS.</p>
+          </div>
           <button
-            className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-100"
+            className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close"
             type="button"
             onClick={onClose}
           >
-            Close
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        <form className="space-y-3" onSubmit={handleSubmit} noValidate>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="fullName">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="fullName">
               Full Name
             </label>
             <input
               id="fullName"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              className={formControlClass}
               value={values.fullName}
               onChange={(event) => handleInputChange("fullName", event.target.value)}
               placeholder="Jane Wanjiru"
@@ -102,12 +109,12 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="phone">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="phone">
               Phone Number
             </label>
             <input
               id="phone"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              className={formControlClass}
               value={values.phone}
               onChange={(event) => handleInputChange("phone", event.target.value)}
               placeholder="+2547XXXXXXXX"
@@ -116,12 +123,12 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="location">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="location">
               Pickup Location
             </label>
             <input
               id="location"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              className={formControlClass}
               value={values.location}
               onChange={(event) => handleInputChange("location", event.target.value)}
               placeholder="Apartment, estate, or street"
@@ -131,12 +138,12 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="service">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="service">
                 Service
               </label>
               <select
                 id="service"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+                className={formControlClass}
                 value={values.service}
                 onChange={(event) => handleInputChange("service", event.target.value)}
               >
@@ -148,14 +155,14 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="pickupDate">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="pickupDate">
                 Pickup Date
               </label>
               <input
                 id="pickupDate"
                 type="date"
                 min={minDate}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+                className={formControlClass}
                 value={values.pickupDate}
                 onChange={(event) => handleInputChange("pickupDate", event.target.value)}
               />
@@ -164,7 +171,7 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
           </div>
 
           <button
-            className="mt-2 w-full rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+            className={`${submitButtonClass} mt-2`}
             type="submit"
           >
             Confirm Pickup
