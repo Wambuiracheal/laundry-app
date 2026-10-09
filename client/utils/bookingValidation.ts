@@ -38,7 +38,9 @@ export function validateBookingForm(values: BookingFormValues): BookingFormError
   if (isBlank(values.pickupDate)) {
     errors.pickupDate = "Pick a date for pickup.";
   } else {
-    const selectedDate = new Date(values.pickupDate);
+    // Parse "YYYY-MM-DD" as a local date; new Date(string) would treat it as UTC midnight.
+    const [year, month, day] = values.pickupDate.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

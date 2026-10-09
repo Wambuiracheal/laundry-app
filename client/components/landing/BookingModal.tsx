@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   hasBookingErrors,
   validateBookingForm,
@@ -36,6 +36,35 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
     return `${year}-${month}-${day}`;
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      setValues(initialValues);
+      setErrors({});
+      setSubmitted(false);
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -59,9 +88,6 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
     }
 
     onBooked(values.fullName.trim());
-    setValues(initialValues);
-    setSubmitted(false);
-    setErrors({});
     onClose();
   }
 
@@ -74,8 +100,14 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="booking-title">
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="booking-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 id="booking-title" className="text-lg font-semibold text-slate-900">Book a pickup</h2>
