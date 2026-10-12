@@ -15,8 +15,8 @@ const progress = [
 const quickServices = serviceItems.filter((item) => ["dry-clean", "wash-fold", "iron-only", "household"].includes(item.id));
 
 const recentOrders = [
-  { id: "#PL-8790", date: "Oct 20, 2023", service: "Wash & Fold", amount: "$32.50" },
-  { id: "#PL-8752", date: "Oct 15, 2023", service: "Dry Cleaning", amount: "$18.00" },
+  { id: "#PL-8790", date: "Oct 20, 2023", service: "Wash & Fold", amount: "KES 1,600" },
+  { id: "#PL-8752", date: "Oct 15, 2023", service: "Dry Cleaning", amount: "KES 3,600" },
 ];
 
 export function DarkDashboardScreen() {

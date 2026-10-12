@@ -6,8 +6,8 @@ import Link from "next/link";
 import { serviceItems } from "@/components/mobile/data";
 
 const recentOrders = [
-  { id: "#8821", service: "Dry Cleaning", detail: "4 items", amount: "$32.50", status: "Processing", tone: "green" },
-  { id: "#8819", service: "Wash & Fold", detail: "8 kg", amount: "$18.00", status: "Out for delivery", tone: "blue" },
+  { id: "#8821", service: "Dry Cleaning", detail: "4 items", amount: "KES 3,600", status: "Processing", tone: "green" },
+  { id: "#8819", service: "Wash & Fold", detail: "8 kg", amount: "KES 1,600", status: "Out for delivery", tone: "blue" },
 ] as const;
 
 const popularServices = serviceItems.filter((item) => ["wash-fold", "dry-clean", "iron-only", "shoes"].includes(item.id));

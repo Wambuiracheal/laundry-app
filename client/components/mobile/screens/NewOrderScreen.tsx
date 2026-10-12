@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { serviceItems } from "@/components/mobile/data";
 import { MinusIcon, PlusIcon } from "@/components/mobile/icons";
 import { AppShell, PageHeading, SoftCard, primaryButtonClass } from "@/components/mobile/primitives";
+import { formatKES } from "@/utils/currency";
 import { validateServiceSelection } from "@/utils/serviceSelectionValidation";
 
 type QtyMap = Record<string, number>;
@@ -22,10 +23,6 @@ const toneStyles = {
 } as const;
 
 const steps = ["Service", "Details", "Payment"];
-
-function formatPrice(value: number) {
-  return `$${value.toFixed(2)}`;
-}
 
 function StatusMessage({ message }: { message: string }) {
   const ok = message.startsWith("Looks good");
@@ -163,7 +160,7 @@ export function NewOrderScreen() {
                         {item.count} × {item.priceLabel}
                       </p>
                     </div>
-                    <span className="font-semibold tabular-nums">{formatPrice(item.price * item.count)}</span>
+                    <span className="font-semibold tabular-nums">{formatKES(item.price * item.count)}</span>
                   </li>
                 ))}
               </ul>
@@ -176,7 +173,7 @@ export function NewOrderScreen() {
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Estimated subtotal</span>
-                <span className="tabular-nums text-blue-700">{formatPrice(subtotal)}</span>
+                <span className="tabular-nums text-blue-700">{formatKES(subtotal)}</span>
               </div>
               <p className="pt-1 text-[11px] text-slate-400">Final price for per-kg services is confirmed after weighing.</p>
             </div>
@@ -207,7 +204,7 @@ export function NewOrderScreen() {
               <p className="text-xs text-slate-500">
                 {totalItems} item{totalItems === 1 ? "" : "s"}
               </p>
-              <p className="text-base font-semibold tabular-nums">{formatPrice(subtotal)}</p>
+              <p className="text-base font-semibold tabular-nums">{formatKES(subtotal)}</p>
             </div>
             <button className={`${primaryButtonClass} px-6`} type="button" onClick={handleContinue}>
               Continue
