@@ -7,7 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { serviceItems } from "@/components/mobile/data";
 import { usePolledData } from "@/hooks/usePolledData";
-import { useSession } from "@/hooks/useSession";
 import {
   ORDER_POLL_INTERVAL_MS,
   STATUS_LABELS,
@@ -30,8 +29,6 @@ export function CustomerDashboardScreen() {
     .filter((order) => order.status === "pending_pickup" && order.pickup_time)
     .sort((a, b) => (a.pickup_time ?? "").localeCompare(b.pickup_time ?? ""))[0];
   const recentOrders = (orders ?? []).slice(0, 3);
-  const role = useSession()?.role;
-  const isShopUser = role === "staff" || role === "admin";
 
   return (
     <AppShell active="home">
@@ -69,16 +66,6 @@ export function CustomerDashboardScreen() {
           <p className="text-xs text-emerald-700">pts available</p>
         </div>
       </section>
-
-      {isShopUser ? (
-        <Link
-          href="/shop"
-          className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300"
-        >
-          Shop console: weigh orders & update status
-          <span aria-hidden>→</span>
-        </Link>
-      ) : null}
 
       <Link href="/new-order" className={`${primaryButtonClass} mt-4 w-full sm:hidden`}>
         <PlusIcon className="h-4 w-4" />

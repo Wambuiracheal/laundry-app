@@ -32,6 +32,11 @@ services:
     build:
       context: ./server
     restart: unless-stopped
+    # Optional local settings such as the Firebase credentials. Values under `environment`
+    # take precedence, so the container keeps using the compose database and Redis.
+    env_file:
+      - path: ./server/.env
+        required: false
     depends_on:
       mysql:
         condition: service_healthy

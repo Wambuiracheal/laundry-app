@@ -46,19 +46,22 @@ async function refreshAccessToken(): Promise<string | null> {
 /**
  * Sends a request with the signed-in user's access token. On a 401 it refreshes the token
  * once and retries, since access tokens are short-lived (and reset when the API restarts).
+ * A FormData body is sent as multipart (for file uploads); anything else is sent as JSON.
  */
 export async function authRequest<TResponse>(
   path: string,
   { method = "GET", body }: { method?: string; body?: unknown } = {},
 ): Promise<TResponse> {
+  const isForm = body instanceof FormData;
   const send = (accessToken?: string) =>
     fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: {
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        // The browser sets the multipart Content-Type (with its boundary) for FormData itself.
+        ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
 
   let response = await send(parseSession(readSessionSnapshot())?.accessToken);

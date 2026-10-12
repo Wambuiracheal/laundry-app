@@ -59,6 +59,8 @@ model Order {
   delivery_time     DateTime?
   status            String      // pending_pickup | picked_up | processing | ready | out_for_delivery | delivered | cancelled
   notes             String?     @db.Text
+  house_details     String?     // house/apartment/gate number
+  delivery_instructions String? @db.Text // directions for the rider (landmarks, what to tell the guard)
   deposit_amount    Decimal?
   total_amount      Decimal?
   remaining_amount  Decimal?
@@ -68,6 +70,7 @@ model Order {
   orderItems        OrderItem[]
   payments          Payment[]
   statusHistory     OrderStatusHistory[]
+  damages           DamageReport[]
   reviews           Review[]
   created_at        DateTime    @default(now())
   updated_at        DateTime    @updatedAt
@@ -83,6 +86,20 @@ model OrderItem {
   quantity   Int      @default(1)
   weight_kg  Decimal? // per-kg services: set when the shop weighs the clothes
   price      Decimal? // null until the shop has weighed/counted the items
+  damages    DamageReport[]
+}
+
+// Pre-existing damage (stains, tears) logged at intake, before washing.
+model DamageReport {
+  id            String     @id @default(uuid())
+  order_id      String
+  order         Order      @relation(fields: [order_id], references: [id])
+  order_item_id String?
+  orderItem     OrderItem? @relation(fields: [order_item_id], references: [id])
+  note          String     @db.Text
+  photo_path    String?    // object path in the Firebase Storage bucket
+  created_by    String     // user id of the staff member who logged it
+  created_at    DateTime   @default(now())
 }
 
 model Payment {

@@ -6,7 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { serviceItems } from "@/components/mobile/data";
 import { CheckIcon } from "@/components/mobile/icons";
 import { AppShell, PageHeading, SoftCard, primaryButtonClass } from "@/components/mobile/primitives";
+import { AddressAutocomplete } from "@/components/shared/form/AddressAutocomplete";
 import { FormField, FormStatusMessage, formControlClass, formSelectClass, formTextareaClass } from "@/components/shared/form/FormField";
+import type { AddressSuggestion } from "@/utils/addressSearch";
 import { fetchServices, rateLabel, requestOrder, type ApiService } from "@/utils/ordersApi";
 import { PICKUP_WINDOWS, pickupDateTime, validateNewOrder, type NewOrderErrors, type NewOrderValues } from "@/utils/newOrderValidation";
 
@@ -17,6 +19,8 @@ const initialValues: NewOrderValues = {
   pickupAddress: "",
   pickupDate: "",
   timeWindow: "",
+  houseDetails: "",
+  deliveryInstructions: "",
   notes: "",
 };
 
@@ -38,6 +42,9 @@ export function NewOrderScreen() {
   const [errors, setErrors] = useState<NewOrderErrors>({});
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Coordinates of the picked suggestion; kept while the typed address still contains it
+  // (so adding "Apt 4B" afterwards doesn't drop the pin).
+  const [pickupLocation, setPickupLocation] = useState<AddressSuggestion | null>(null);
 
   useEffect(() => {
     fetchServices()
@@ -55,6 +62,18 @@ export function NewOrderScreen() {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+  }
+
+  function changeAddress(address: string) {
+    setField("pickupAddress", address);
+    if (pickupLocation && !address.includes(pickupLocation.label)) {
+      setPickupLocation(null);
+    }
+  }
+
+  function selectAddress(suggestion: AddressSuggestion) {
+    setField("pickupAddress", suggestion.label);
+    setPickupLocation(suggestion);
   }
 
   function toggleService(serviceId: string) {
@@ -80,8 +99,12 @@ export function NewOrderScreen() {
       const order = await requestOrder({
         service_ids: values.serviceIds,
         pickup_address: values.pickupAddress.trim(),
+        pickup_lat: pickupLocation?.lat ?? null,
+        pickup_lng: pickupLocation?.lng ?? null,
         pickup_time: pickupDateTime(values).toISOString(),
         notes: values.notes.trim(),
+        house_details: values.houseDetails.trim(),
+        delivery_instructions: values.deliveryInstructions.trim(),
       });
       router.push(`/order-tracking?id=${order.id}`);
     } catch (error) {
@@ -165,14 +188,54 @@ export function NewOrderScreen() {
 
           <section className="space-y-4">
             <h2 className="text-sm font-semibold">2. Pickup details</h2>
-            <FormField htmlFor="pickupAddress" label="Pickup address" error={errors.pickupAddress}>
-              <input
+            <FormField
+              htmlFor="pickupAddress"
+              label="Pickup address"
+              error={errors.pickupAddress}
+              info={
+                pickupLocation
+                  ? "Location pinned. Add a house or apartment number if needed."
+                  : "Start typing a building, street or estate and pick a suggestion."
+              }
+            >
+              <AddressAutocomplete
                 id="pickupAddress"
-                className={formControlClass}
-                placeholder="e.g. Kilimani, Argwings Kodhek Rd, Apt 4B"
-                autoComplete="street-address"
+                placeholder="e.g. Yaya Centre, Kilimani"
                 value={values.pickupAddress}
-                onChange={(event) => setField("pickupAddress", event.target.value)}
+                onChange={changeAddress}
+                onSelect={selectAddress}
+              />
+            </FormField>
+
+            <FormField
+              htmlFor="houseDetails"
+              label="House, apartment or gate (optional)"
+              info="e.g. Apt 4B, Block C, Gate 2"
+              error={errors.houseDetails}
+            >
+              <input
+                id="houseDetails"
+                className={formControlClass}
+                maxLength={191}
+                autoComplete="address-line2"
+                value={values.houseDetails}
+                onChange={(event) => setField("houseDetails", event.target.value)}
+              />
+            </FormField>
+
+            <FormField
+              htmlFor="deliveryInstructions"
+              label="Directions for the rider (optional)"
+              info="Landmarks, which gate to use, what to tell the guard or reception."
+              error={errors.deliveryInstructions}
+            >
+              <textarea
+                id="deliveryInstructions"
+                className={formTextareaClass}
+                maxLength={500}
+                placeholder="e.g. Blue gate opposite the Shell petrol station. Tell the guard you're collecting for Apt 4B."
+                value={values.deliveryInstructions}
+                onChange={(event) => setField("deliveryInstructions", event.target.value)}
               />
             </FormField>
 
@@ -206,8 +269,8 @@ export function NewOrderScreen() {
 
             <FormField
               htmlFor="notes"
-              label="Notes for the rider (optional)"
-              info="Number of bags, gate code, stains to look at, and so on."
+              label="Notes about your laundry (optional)"
+              info="Number of bags, stains to look at, special care, and so on."
               error={errors.notes}
             >
               <textarea

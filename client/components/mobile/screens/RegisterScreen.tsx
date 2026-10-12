@@ -9,7 +9,6 @@ import {
     FormField,
     FormStatusMessage,
     formControlClass,
-    formSelectClass,
     iconInputWrapperClass,
     submitButtonClass,
 } from "@/components/shared/form/FormField";
@@ -20,6 +19,7 @@ import {
     type RegisterValues,
     validateRegister,
 } from "@/utils/registerValidation";
+import { homeForRole, type SignupRole } from "@/utils/roles";
 import { saveSession } from "@/utils/session";
 
 const initialValues: RegisterValues = {
@@ -28,14 +28,26 @@ const initialValues: RegisterValues = {
     phone: "",
     password: "",
     confirmPassword: "",
-    role: "admin",
+};
+
+const copy: Record<SignupRole, { title: string; subtitle: string; submit: string }> = {
+    customer: {
+        title: "Create your account",
+        subtitle: "Set up your Panda Laundry profile in under a minute.",
+        submit: "Create account",
+    },
+    rider: {
+        title: "Ride with Panda Laundry",
+        subtitle: "Sign up as a rider to pick up and deliver laundry around you.",
+        submit: "Create rider account",
+    },
 };
 
 function handleGoogleSignup() {
     window.location.assign(getGoogleSignupUrl());
 }
 
-export function RegisterScreen() {
+export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
     const [values, setValues] = useState<RegisterValues>(initialValues);
     const [errors, setErrors] = useState<RegisterErrors>({});
     const [status, setStatus] = useState<string | null>(null);
@@ -65,17 +77,17 @@ export function RegisterScreen() {
             setIsSubmitting(true);
             setStatus(null);
 
-            const result = await signup(values);
+            const result = await signup(values, role);
 
             saveSession({
                 accessToken: result.accessToken,
                 refreshToken: result.refreshToken,
                 email: result.user?.email ?? values.email.trim(),
                 fullName: result.user?.fullName ?? values.fullName.trim(),
-                role: result.user?.role ?? values.role,
+                role: result.user?.role,
             });
             setStatus("Account created. Redirecting...");
-            router.replace("/customer-dashboard");
+            router.replace(homeForRole(result.user?.role ?? role));
             setValues(initialValues);
             setErrors({});
         } catch (error) {
@@ -87,7 +99,7 @@ export function RegisterScreen() {
     }
 
     return (
-        <AuthLayout title="Create your account" subtitle="Set up your Panda Laundry profile in under a minute.">
+        <AuthLayout title={copy[role].title} subtitle={copy[role].subtitle}>
             <form className="space-y-4" onSubmit={submit} noValidate>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <FormField htmlFor="fullName" label="Full name" error={errors.fullName}>
@@ -182,33 +194,21 @@ export function RegisterScreen() {
                     <p className="-mt-2 text-xs text-slate-400">Use at least 8 characters. Mixing letters and numbers makes it stronger.</p>
                 ) : null}
 
-                <FormField htmlFor="role" label="Role" info="Default role set to admin" error={errors.role}>
-                    <select
-                        id="role"
-                        className={formSelectClass}
-                        value={values.role}
-                        onChange={(event) => setField("role", event.target.value)}
-                    >
-                        <option value="">Select a role...</option>
-                        <option value="admin">admin</option>
-                        <option value="customer">customer</option>
-                        <option value="rider">rider</option>
-                        <option value="staff">staff</option>
-                    </select>
-                </FormField>
-
                 <button className={submitButtonClass} type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating account..." : "Create account"}
+                    {isSubmitting ? "Creating account..." : copy[role].submit}
                 </button>
 
-                <button
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-                    type="button"
-                    onClick={handleGoogleSignup}
-                    disabled={isSubmitting}
-                >
-                    Continue with Google
-                </button>
+                {/* Google signup creates a customer account, so riders register with email only. */}
+                {role === "customer" ? (
+                    <button
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                        type="button"
+                        onClick={handleGoogleSignup}
+                        disabled={isSubmitting}
+                    >
+                        Continue with Google
+                    </button>
+                ) : null}
 
                 {status ? <FormStatusMessage message={status} /> : null}
 
@@ -216,6 +216,15 @@ export function RegisterScreen() {
                     Already have an account?{" "}
                     <Link href="/login" className="font-semibold text-blue-700 hover:text-blue-800">
                         Log in
+                    </Link>
+                </p>
+                <p className="text-center text-sm text-slate-500">
+                    {role === "rider" ? "Need laundry done instead? " : "Want to deliver for us? "}
+                    <Link
+                        href={role === "rider" ? "/register" : "/register/rider"}
+                        className="font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                        {role === "rider" ? "Create a customer account" : "Sign up as a rider"}
                     </Link>
                 </p>
             </form>

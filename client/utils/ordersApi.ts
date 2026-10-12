@@ -34,8 +34,15 @@ export type OrderStatus =
 export type ApiOrder = {
   id: string;
   pickup_address: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   pickup_time: string | null;
+  assigned_rider_id: string | null;
   notes: string | null;
+  /** House/apartment/gate number. */
+  house_details: string | null;
+  /** Directions for the rider: landmarks, what to tell the guard. */
+  delivery_instructions: string | null;
   status: OrderStatus;
   total_amount: DecimalString | null;
   remaining_amount: DecimalString | null;
@@ -43,8 +50,31 @@ export type ApiOrder = {
   created_at: string;
   updated_at: string;
   orderItems: ApiOrderItem[];
-  statusHistory: { id: string; status: OrderStatus; timestamp: string }[];
-  user?: { first_name: string; last_name: string; phone: string; email: string };
+  /** Not included in rider job payloads. */
+  statusHistory?: { id: string; status: OrderStatus; timestamp: string }[];
+  /** Damage logged at intake (customer and shop views; not in rider payloads). */
+  damages?: DamageReport[];
+  /** Riders only get the first name for open jobs; full contact details once they accept. */
+  user?: { first_name: string; last_name?: string; phone?: string; email?: string };
+  /** Shop queue only: the rider currently holding the job. */
+  assignedRider?: { id: string; first_name: string; last_name: string; phone: string } | null;
+};
+
+export type RiderSummary = { id: string; first_name: string; last_name: string; phone: string; active_jobs: number };
+
+/** Order statuses where a rider can hold the job. */
+export const RIDER_ACTIVE_STATUSES: OrderStatus[] = ["pending_pickup", "ready", "out_for_delivery"];
+
+export type RiderJobs = { mine: ApiOrder[]; available: ApiOrder[] };
+
+/** Pre-existing damage found when the clothes reached the shop. */
+export type DamageReport = {
+  id: string;
+  order_item_id: string | null;
+  note: string;
+  /** Short-lived signed link to the photo, or null when there is none. */
+  photo_url: string | null;
+  created_at: string;
 };
 
 export type MeasurementInput = { id: string; weight_kg?: number; quantity?: number };
@@ -79,7 +109,16 @@ export function fetchServices() {
   return authRequest<ApiService[]>("/api/services");
 }
 
-export function requestOrder(payload: { service_ids: string[]; pickup_address: string; pickup_time: string; notes: string }) {
+export function requestOrder(payload: {
+  service_ids: string[];
+  pickup_address: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  pickup_time: string;
+  notes: string;
+  house_details: string;
+  delivery_instructions: string;
+}) {
   return authRequest<ApiOrder>("/api/orders/request", { method: "POST", body: payload });
 }
 
@@ -97,6 +136,50 @@ export function measureOrder(orderId: string, items: MeasurementInput[]) {
 
 export function updateOrderStatus(orderId: string, status: OrderStatus) {
   return authRequest<ApiOrder>(`/api/orders/${orderId}/status`, { method: "PATCH", body: { status } });
+}
+
+export function fetchRiders() {
+  return authRequest<RiderSummary[]>("/api/orders/riders");
+}
+
+/** Assign a rider, or pass null to return the job to the open pool. */
+export function assignRider(orderId: string, riderId: string | null) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/assign`, { method: "PATCH", body: { rider_id: riderId } });
+}
+
+/** Log damage found at intake; the photo is optional. */
+export function logDamage(orderId: string, damage: { note: string; orderItemId: string | null; photo: File | null }) {
+  const form = new FormData();
+  form.set("note", damage.note);
+  if (damage.orderItemId) form.set("order_item_id", damage.orderItemId);
+  if (damage.photo) form.set("photo", damage.photo);
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/damages`, { method: "POST", body: form });
+}
+
+export function deleteDamage(orderId: string, damageId: string) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/damages/${damageId}`, { method: "DELETE" });
+}
+
+export function updateService(serviceId: string, changes: Partial<Pick<ApiService, "base_price" | "price_type" | "description">>) {
+  return authRequest<ApiService>(`/api/services/${serviceId}`, { method: "PATCH", body: changes });
+}
+
+export function fetchRiderJobs() {
+  return authRequest<RiderJobs>("/api/orders/rider/jobs");
+}
+
+export function claimJob(orderId: string) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/claim`, { method: "POST" });
+}
+
+export function updateJobStatus(orderId: string, status: OrderStatus) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/rider-status`, { method: "PATCH", body: { status } });
+}
+
+/** wa.me link for a Kenyan number in +254…, 254… or 07… form. */
+export function whatsappUrl(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits.startsWith("0") ? `254${digits.slice(1)}` : digits}`;
 }
 
 /** Short, human-friendly reference, e.g. "#PL-3F9A2C". */

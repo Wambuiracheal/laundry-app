@@ -3,6 +3,8 @@ export type NewOrderValues = {
   pickupAddress: string;
   pickupDate: string;
   timeWindow: string;
+  houseDetails: string;
+  deliveryInstructions: string;
   notes: string;
 };
 
@@ -42,6 +44,14 @@ export function validateNewOrder(values: NewOrderValues): NewOrderErrors {
     errors.timeWindow = "Choose a pickup window.";
   } else if (values.pickupDate && pickupDateTime(values) <= new Date()) {
     errors.timeWindow = "That window has already passed. Choose a later one.";
+  }
+
+  if (values.houseDetails.trim().length > 191) {
+    errors.houseDetails = "Keep this under 191 characters.";
+  }
+
+  if (values.deliveryInstructions.trim().length > 500) {
+    errors.deliveryInstructions = "Directions must be 500 characters or fewer.";
   }
 
   if (values.notes.length > 1000) {

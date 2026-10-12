@@ -13,7 +13,7 @@ import {
 } from "@/components/shared/form/FormField";
 import { getGoogleLoginUrl, login } from "@/utils/authApi";
 import { hasLoginErrors, type LoginErrors, type LoginValues, validateLogin } from "@/utils/loginValidation";
-import { safeNextPath, saveSession } from "@/utils/session";
+import { postLoginPath, saveSession } from "@/utils/session";
 
 const initialValues: LoginValues = {
     email: "",
@@ -64,7 +64,7 @@ export function LoginScreen() {
                 role: result.user?.role,
             });
             setStatus("Login successful. Redirecting...");
-            router.replace(safeNextPath(new URLSearchParams(window.location.search).get("next")));
+            router.replace(postLoginPath(new URLSearchParams(window.location.search).get("next"), result.user?.role));
         } catch (error) {
             const message = error instanceof Error ? error.message : "Login failed.";
             setStatus(message);

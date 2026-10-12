@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckIcon, PlusIcon } from "@/components/mobile/icons";
 import { AppShell, Badge, PageHeading, SoftCard, primaryButtonClass, secondaryButtonClass } from "@/components/mobile/primitives";
+import { DamageList, DeliveryInstructions } from "@/components/mobile/OrderDetails";
 import { FormStatusMessage } from "@/components/shared/form/FormField";
 import { usePolledData } from "@/hooks/usePolledData";
 import { formatKES } from "@/utils/currency";
@@ -36,7 +37,7 @@ const timelineCopy: Record<Exclude<OrderStatus, "cancelled">, { title: string; d
 
 function Timeline({ order }: { order: ApiOrder }) {
   const currentIndex = ORDER_FLOW.indexOf(order.status);
-  const reachedAt = (status: OrderStatus) => order.statusHistory.findLast((entry) => entry.status === status)?.timestamp ?? null;
+  const reachedAt = (status: OrderStatus) => order.statusHistory?.findLast((entry) => entry.status === status)?.timestamp ?? null;
 
   return (
     <ol className="mt-4">
@@ -196,7 +197,20 @@ export function OrderTrackingScreen() {
                     </div>
                   ) : null}
                 </dl>
+                <div className="mt-3">
+                  <DeliveryInstructions order={order} />
+                </div>
               </SoftCard>
+
+              {(order.damages ?? []).length > 0 ? (
+                <SoftCard className="lg:p-5">
+                  <h2 className="text-base font-semibold">Condition at intake</h2>
+                  <p className="mb-3 text-xs text-slate-500">
+                    We found this before washing and photographed it where possible. Contact support if anything looks wrong.
+                  </p>
+                  <DamageList order={order} />
+                </SoftCard>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-3">
                 <Link href="/support" className={primaryButtonClass}>

@@ -4,6 +4,8 @@ const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
 const { PrismaClient } = require('@prisma/client');
 const { privateKey, publicKey, signAccessToken } = require('../utils/tokens');
+const { requireAuth, requireRole } = require('../middlewares/auth');
+const { ROLES } = require('../utils/roles');
 const {
   validateSignupRequest,
   validateLoginRequest,
@@ -119,7 +121,8 @@ router.post("/login", validateLoginRequest, async (req, res) => {
 });
 
 // --- 2. Manual Token Generation (for testing) ---
-router.post("/token", validateTokenIssueRequest, async (req, res) => {
+// Admin only: it signs a token for any userId/role, so it must never be public.
+router.post("/token", requireAuth, requireRole(ROLES.ADMIN), validateTokenIssueRequest, async (req, res) => {
   try {
     const { userId, role } = req.validatedTokenIssue;
 
