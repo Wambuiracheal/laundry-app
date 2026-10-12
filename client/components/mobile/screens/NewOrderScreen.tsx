@@ -9,7 +9,8 @@ import { AppShell, PageHeading, SoftCard, primaryButtonClass } from "@/component
 import { AddressAutocomplete } from "@/components/shared/form/AddressAutocomplete";
 import { FormField, FormStatusMessage, formControlClass, formSelectClass, formTextareaClass } from "@/components/shared/form/FormField";
 import type { AddressSuggestion } from "@/utils/addressSearch";
-import { fetchServices, rateLabel, requestOrder, type ApiService } from "@/utils/ordersApi";
+import { fetchDeliveryQuote, fetchServices, rateLabel, requestOrder, type ApiService, type DeliveryQuote } from "@/utils/ordersApi";
+import { formatKES } from "@/utils/currency";
 import { PICKUP_WINDOWS, pickupDateTime, validateNewOrder, type NewOrderErrors, type NewOrderValues } from "@/utils/newOrderValidation";
 
 const steps = ["Request pickup", "We weigh at the shop", "Pay final price"];
@@ -45,6 +46,9 @@ export function NewOrderScreen() {
   // Coordinates of the picked suggestion; kept while the typed address still contains it
   // (so adding "Apt 4B" afterwards doesn't drop the pin).
   const [pickupLocation, setPickupLocation] = useState<AddressSuggestion | null>(null);
+  // Delivery fee quote for the pinned address, tagged with the address it was quoted for so a
+  // slow response for an earlier pick is never shown against a newer one.
+  const [quote, setQuote] = useState<{ forId: string; value: DeliveryQuote | null; loading: boolean } | null>(null);
 
   useEffect(() => {
     fetchServices()
@@ -74,6 +78,10 @@ export function NewOrderScreen() {
   function selectAddress(suggestion: AddressSuggestion) {
     setField("pickupAddress", suggestion.label);
     setPickupLocation(suggestion);
+    setQuote({ forId: suggestion.id, value: null, loading: true });
+    fetchDeliveryQuote(suggestion.lat, suggestion.lng)
+      .then((value) => setQuote((prev) => (prev?.forId === suggestion.id ? { forId: suggestion.id, value, loading: false } : prev)))
+      .catch(() => setQuote((prev) => (prev?.forId === suggestion.id ? { forId: suggestion.id, value: null, loading: false } : prev)));
   }
 
   function toggleService(serviceId: string) {
@@ -83,9 +91,15 @@ export function NewOrderScreen() {
     );
   }
 
+  const currentQuote = quote && pickupLocation && quote.forId === pickupLocation.id ? quote : null;
+
   async function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateNewOrder(values);
+    // The delivery fee is measured on the map, so the address must come from the suggestions.
+    if (!nextErrors.pickupAddress && !pickupLocation) {
+      nextErrors.pickupAddress = "Choose your address from the suggestions so we can find it on the map.";
+    }
     setErrors(nextErrors);
 
     if (Object.values(nextErrors).some(Boolean)) {
@@ -195,7 +209,7 @@ export function NewOrderScreen() {
               info={
                 pickupLocation
                   ? "Location pinned. Add a house or apartment number if needed."
-                  : "Start typing a building, street or estate and pick a suggestion."
+                  : "Start typing a building, street or estate and pick a suggestion. We use it to measure the delivery distance."
               }
             >
               <AddressAutocomplete
@@ -301,11 +315,26 @@ export function NewOrderScreen() {
               </ul>
             )}
 
+            <div className="mt-4 flex items-start justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+              <div>
+                <p className="font-medium text-slate-800">Pickup & delivery</p>
+                <p className="text-xs text-slate-500">
+                  {currentQuote?.loading
+                    ? "Working out the distance…"
+                    : currentQuote?.value
+                      ? `${currentQuote.value.delivery_distance_km} km each way · ${formatKES(currentQuote.value.delivery_rate_per_km)}/km`
+                      : "Choose your address from the suggestions to see the fee."}
+                </p>
+              </div>
+              <span className="shrink-0 font-semibold tabular-nums">{currentQuote?.value ? formatKES(currentQuote.value.delivery_fee) : "—"}</span>
+            </div>
+
             <div className="mt-4 rounded-xl bg-blue-50 px-3 py-2.5 text-xs leading-5 text-blue-900">
               <p className="font-semibold">How pricing works</p>
               <p>
-                When your clothes reach the shop we weigh them (or count items like suits and shoes). Your total updates
-                on the order page as soon as that&apos;s done.
+                When your clothes reach the shop we weigh them (or count items like suits and shoes). Your total is the
+                laundry plus pickup & delivery, and updates on the order page as soon as that&apos;s done. You pay before
+                your clean clothes leave the shop.
               </p>
             </div>
 

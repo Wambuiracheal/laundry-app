@@ -8,7 +8,7 @@ export const ALERT_THRESHOLDS = {
   pickupDueSoonMs: 60 * MINUTE,
   /** Clothes at the shop not weighed after this long. */
   unweighedMs: 2 * 60 * MINUTE,
-  /** A ready order nobody has accepted for delivery after this long. */
+  /** A ready order nobody has accepted for delivery (or the customer hasn't paid for) after this long. */
   readyWithoutRiderMs: 60 * MINUTE,
   /** A delivery still on the road after this long. */
   slowDeliveryMs: 2 * 60 * MINUTE,
@@ -45,9 +45,11 @@ export function orderAlert(order: ApiOrder, now: number): OrderAlert | null {
       return waiting > ALERT_THRESHOLDS.unweighedMs ? { level: "overdue", label: `At shop ${formatDuration(waiting)}, not weighed` } : null;
     }
     case "ready": {
-      if (order.assigned_rider_id) return null;
       const waiting = now - enteredStatusAt(order, "ready");
-      return waiting > ALERT_THRESHOLDS.readyWithoutRiderMs ? { level: "overdue", label: `Ready ${formatDuration(waiting)}, no rider` } : null;
+      if (waiting <= ALERT_THRESHOLDS.readyWithoutRiderMs) return null;
+      // Unpaid orders can't leave the shop, so chase the payment before a rider.
+      if (order.payment_status !== "paid") return { level: "overdue", label: `Ready ${formatDuration(waiting)}, not paid` };
+      return order.assigned_rider_id ? null : { level: "overdue", label: `Ready ${formatDuration(waiting)}, no rider` };
     }
     case "out_for_delivery": {
       const onRoad = now - enteredStatusAt(order, "out_for_delivery");

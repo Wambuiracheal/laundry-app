@@ -5,6 +5,9 @@ const multer = require('multer');
 const { publishEvent } = require('../utils/redis');
 const { IMAGE_TYPES, isStorageConfigured, uploadImage, getSignedImageUrl, deleteImage } = require('../utils/storage');
 const { ROLES, SHOP_ROLES } = require('../utils/roles');
+const { recordTripEarning } = require('../utils/riderEarnings');
+const { quoteDelivery, recalculateOrderTotal, ensureDeliveryFee, isOrderPriced } = require('../utils/deliveryFee');
+const { geocodeAddress } = require('../utils/geocode');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -25,10 +28,16 @@ const trackedOrderInclude = {
   damages: { orderBy: { created_at: 'asc' } },
 };
 
-// Rider jobs: pickups waiting at the customer, and priced orders waiting to go back.
-const RIDER_CLAIMABLE_STATUSES = ['pending_pickup', 'ready'];
+// Statuses in which a rider holds a job: collecting, waiting to take it back, delivering.
 const RIDER_ACTIVE_STATUSES = ['pending_pickup', 'ready', 'out_for_delivery'];
 const RIDER_TRANSITIONS = { pending_pickup: 'picked_up', ready: 'out_for_delivery', out_for_delivery: 'delivered' };
+// Jobs a rider can accept: any pickup, but a delivery only once the customer has paid in full,
+// because clothes are never released from the shop unpaid.
+const claimableJobWhere = { OR: [{ status: 'pending_pickup' }, { status: 'ready', payment_status: 'paid' }] };
+// Statuses that take the clothes out of the shop, which requires full payment.
+const RELEASE_STATUSES = ['out_for_delivery', 'delivered'];
+// Which rider trip a status change completes (the rider is paid per trip).
+const TRIP_COMPLETED_BY = { picked_up: 'pickup', delivered: 'delivery' };
 
 const riderJobInclude = {
   orderItems: { include: { service: true } },
@@ -85,6 +94,22 @@ const roundMoney = (value) => Math.round(value * 100) / 100;
 const notifyOrderUpdated = (order) =>
   publishEvent('laundry-events', { type: 'order.updated', orderId: order.id, status: order.status }).catch(() => undefined);
 
+// customer: price the pickup + delivery for a pinned address before placing the order
+router.get('/delivery-quote', requireAuth, requireRole(ROLES.CUSTOMER), async (req, res) => {
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+      return res.status(400).json({ error: 'lat and lng are required' });
+    }
+    const quote = await quoteDelivery({ lat, lng });
+    // null: the shop location isn't configured yet, so the fee is set at pickup instead.
+    res.json(quote);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to quote delivery', details: error.message });
+  }
+});
+
 // customer: request a pickup. Only the services are chosen here; the shop weighs/counts
 // the clothes on arrival and prices each item via PATCH /:id/measure.
 router.post('/request', requireAuth, requireRole(ROLES.CUSTOMER), async (req, res) => {
@@ -130,6 +155,14 @@ router.post('/request', requireAuth, requireRole(ROLES.CUSTOMER), async (req, re
     }
 
     const services = await prisma.service.findMany({ where: { id: { in: serviceIds } } });
+    // Every order needs a map location so the delivery fee can be measured. Without a picked
+    // suggestion, look the typed address up on the map.
+    const location = hasCoords ? { lat, lng } : await geocodeAddress(address);
+    if (!location) {
+      return res.status(400).json({ error: 'We could not find that address on the map. Choose one of the address suggestions.' });
+    }
+    // Fixed now, so the customer is charged (and riders paid) what they were quoted.
+    const deliveryFee = await quoteDelivery(location);
     if (services.length !== serviceIds.length) {
       return res.status(400).json({ error: 'One or more selected services do not exist' });
     }
@@ -138,11 +171,12 @@ router.post('/request', requireAuth, requireRole(ROLES.CUSTOMER), async (req, re
       data: {
         user_id: req.user.userId,
         pickup_address: address,
-        pickup_lat: hasCoords ? lat : null,
-        pickup_lng: hasCoords ? lng : null,
+        pickup_lat: location.lat,
+        pickup_lng: location.lng,
         pickup_time: pickupTime,
         notes: trimmedNotes || null,
         house_details: houseDetails || null,
+        ...(deliveryFee ?? {}),
         delivery_instructions: deliveryInstructions || null,
         status: 'pending_pickup',
         payment_status: 'pending',
@@ -353,10 +387,11 @@ router.patch('/:id/measure', requireAuth, requireRole(...SHOP_ROLES), async (req
       }
     }
 
+    // Retry the map-based delivery fee if it could not be worked out when the order was placed.
+    if (order.delivery_fee === null) await ensureDeliveryFee(prisma, order.id);
+
     const prices = order.orderItems.map((item) => (itemData.has(item.id) ? itemData.get(item.id).price : item.price));
     const allMeasured = prices.every((price) => price !== null);
-    const total = roundMoney(prices.reduce((sum, price) => sum + Number(price ?? 0), 0));
-    const deposit = Number(order.deposit_amount ?? 0);
     // Once everything is weighed the clothes go into the wash.
     const nextStatus = allMeasured && ['pending_pickup', 'picked_up'].includes(order.status) ? 'processing' : order.status;
 
@@ -371,15 +406,11 @@ router.patch('/:id/measure', requireAuth, requireRole(...SHOP_ROLES), async (req
         });
       }
 
-      return tx.order.update({
-        where: { id: order.id },
-        data: {
-          total_amount: total,
-          remaining_amount: roundMoney(Math.max(total - deposit, 0)),
-          status: nextStatus,
-        },
-        include: trackedOrderInclude,
-      });
+      await tx.order.update({ where: { id: order.id }, data: { status: nextStatus } });
+      // Total = items + delivery fee; the balance accounts for anything already paid, in case
+      // the order is re-weighed after payment.
+      await recalculateOrderTotal(tx, order.id);
+      return tx.order.findUnique({ where: { id: order.id }, include: trackedOrderInclude });
     });
 
     notifyOrderUpdated(updated);
@@ -409,6 +440,12 @@ router.patch('/:id/status', requireAuth, requireRole(...SHOP_ROLES), async (req,
     if (needsPrice && existing.orderItems.some((item) => item.price === null)) {
       return res.status(400).json({ error: 'Weigh or count every item before marking the order as ' + status });
     }
+    if (needsPrice && !isOrderPriced(existing)) {
+      return res.status(400).json({ error: 'Set the delivery distance so the customer has a final price before marking the order as ' + status });
+    }
+    if (RELEASE_STATUSES.includes(status) && existing.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'The customer has not paid in full yet. Clothes can only leave the shop once the order is paid.' });
+    }
 
     const [, order] = await prisma.$transaction([
       prisma.orderStatusHistory.create({ data: { order_id: existing.id, status, changed_by: req.user.role } }),
@@ -419,6 +456,11 @@ router.patch('/:id/status', requireAuth, requireRole(...SHOP_ROLES), async (req,
         include: trackedOrderInclude,
       }),
     ]);
+
+    // If the shop records the trip on the rider's behalf, the assigned rider is still paid for it.
+    if (TRIP_COMPLETED_BY[status] && existing.assigned_rider_id) {
+      await recordTripEarning({ orderId: existing.id, riderId: existing.assigned_rider_id, leg: TRIP_COMPLETED_BY[status] });
+    }
 
     notifyOrderUpdated(order);
     res.json(await presentOrder(order));
@@ -437,7 +479,7 @@ router.get('/rider/jobs', requireAuth, requireRole(ROLES.RIDER), async (req, res
         orderBy: { pickup_time: 'asc' },
       }),
       prisma.order.findMany({
-        where: { assigned_rider_id: null, status: { in: RIDER_CLAIMABLE_STATUSES } },
+        where: { assigned_rider_id: null, ...claimableJobWhere },
         include: openJobInclude,
         orderBy: { pickup_time: 'asc' },
       }),
@@ -453,7 +495,7 @@ router.post('/:id/claim', requireAuth, requireRole(ROLES.RIDER), async (req, res
   try {
     // Conditional update so two riders can't claim the same job.
     const { count } = await prisma.order.updateMany({
-      where: { id: req.params.id, assigned_rider_id: null, status: { in: RIDER_CLAIMABLE_STATUSES } },
+      where: { id: req.params.id, assigned_rider_id: null, ...claimableJobWhere },
       data: { assigned_rider_id: req.user.userId },
     });
     if (count === 0) {
@@ -482,6 +524,9 @@ router.patch('/:id/rider-status', requireAuth, requireRole(ROLES.RIDER), async (
     if (RIDER_TRANSITIONS[existing.status] !== status) {
       return res.status(400).json({ error: `Cannot move an order from ${existing.status} to ${status}` });
     }
+    if (RELEASE_STATUSES.includes(status) && existing.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'The customer has not paid yet. Collect the clothes from the shop only after payment.' });
+    }
 
     const [, order] = await prisma.$transaction([
       prisma.orderStatusHistory.create({ data: { order_id: existing.id, status, changed_by: req.user.role } }),
@@ -492,6 +537,10 @@ router.patch('/:id/rider-status', requireAuth, requireRole(ROLES.RIDER), async (
         include: riderJobInclude,
       }),
     ]);
+
+    if (TRIP_COMPLETED_BY[status]) {
+      await recordTripEarning({ orderId: existing.id, riderId: req.user.userId, leg: TRIP_COMPLETED_BY[status] });
+    }
 
     notifyOrderUpdated(order);
     res.json(order);

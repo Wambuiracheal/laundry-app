@@ -23,6 +23,8 @@ model User {
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
   assignedOrders Order[]       @relation("AssignedRiderOrders")
+  earnings      RiderEarning[] @relation("RiderEarnings")
+  location      RiderLocation?
   refreshTokens RefreshToken[]
 }
 
@@ -61,6 +63,12 @@ model Order {
   notes             String?     @db.Text
   house_details     String?     // house/apartment/gate number
   delivery_instructions String? @db.Text // directions for the rider (landmarks, what to tell the guard)
+  // Pickup + delivery fee charged to the customer and paid on to riders: two trips of
+  // (shop <-> customer km x rate), fixed when quoted so customer and riders see the same numbers.
+  delivery_distance_km     Decimal? @db.Decimal(8, 2) // one way
+  delivery_distance_source String?  // road | straight_line | manual
+  delivery_rate_per_km     Decimal? @db.Decimal(10, 2)
+  delivery_fee             Decimal? @db.Decimal(10, 2) // both trips; null until the distance is known
   deposit_amount    Decimal?
   total_amount      Decimal?
   remaining_amount  Decimal?
@@ -71,6 +79,7 @@ model Order {
   payments          Payment[]
   statusHistory     OrderStatusHistory[]
   damages           DamageReport[]
+  riderEarnings     RiderEarning[]
   reviews           Review[]
   created_at        DateTime    @default(now())
   updated_at        DateTime    @updatedAt
@@ -87,6 +96,45 @@ model OrderItem {
   weight_kg  Decimal? // per-kg services: set when the shop weighs the clothes
   price      Decimal? // null until the shop has weighed/counted the items
   damages    DamageReport[]
+}
+
+// What a rider earns for one trip: the pickup (customer -> shop) or the delivery (shop -> customer).
+// Each trip is paid to whoever did it, at the per-km rate in force at the time.
+model RiderEarning {
+  id              String    @id @default(uuid())
+  rider_id        String
+  rider           User      @relation("RiderEarnings", fields: [rider_id], references: [id])
+  order_id        String
+  order           Order     @relation(fields: [order_id], references: [id])
+  leg             String    // pickup | delivery
+  distance_km     Decimal?  @db.Decimal(8, 2)
+  distance_source String?   // road | straight_line | manual
+  rate_per_km     Decimal   @db.Decimal(10, 2)
+  amount          Decimal?  @db.Decimal(10, 2)
+  status          String    // needs_distance | unpaid | paid
+  paid_at         DateTime?
+  created_at      DateTime  @default(now())
+
+  @@unique([order_id, leg])
+}
+
+// A rider's latest GPS position, shared from the rider app while they have active jobs.
+// One row per rider, overwritten on every update; not a location history.
+model RiderLocation {
+  rider_id   String   @id
+  rider      User     @relation(fields: [rider_id], references: [id])
+  lat        Float
+  lng        Float
+  accuracy_m Float?
+  heading    Float?
+  updated_at DateTime @default(now()) @updatedAt
+}
+
+// Admin-editable settings (rider rate per km, shop location), stored as strings.
+model Setting {
+  key        String   @id
+  value      String
+  updated_at DateTime @default(now()) @updatedAt
 }
 
 // Pre-existing damage (stains, tears) logged at intake, before washing.
@@ -109,8 +157,17 @@ model Payment {
   amount         Decimal
   payment_method String   // mpesa | card | cash
   transaction_id String?
-  status         String
+  status         String   // pending | success | failed
+  // M-Pesa STK push details
+  phone               String?   // 2547XXXXXXXX the prompt was sent to
+  checkout_request_id String?   @unique
+  merchant_request_id String?
+  mpesa_receipt       String?   // e.g. "SJK4XXXXXX", only known from the Daraja callback
+  result_code         String?
+  result_desc         String?
+  last_queried_at     DateTime? // throttles STK status queries to Daraja
   created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
   transaction    Transaction?
 }
 

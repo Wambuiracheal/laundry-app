@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { AppShell, Badge, PageHeading, SoftCard, primaryButtonClass, secondaryButtonClass } from "@/components/mobile/primitives";
 import { FormStatusMessage, formControlClass, formSelectClass } from "@/components/shared/form/FormField";
@@ -21,11 +22,14 @@ import {
   fetchOrderQueue,
   fetchRiders,
   formatDateTime,
+  deliveryFeeDetail,
   isOrderFullyMeasured,
+  isOrderPriced,
   logDamage,
   measureOrder,
   orderRef,
   orderTotalLabel,
+  paymentBadge,
   rateLabel,
   updateOrderStatus,
   type ApiOrder,
@@ -175,6 +179,26 @@ function DamageSection({ order, onSaved }: { order: ApiOrder; onSaved: (order: A
   );
 }
 
+/** Pickup + delivery fee line. The distance always comes from the map; nobody enters it. */
+function DeliveryFeeRow({ order }: { order: ApiOrder }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Pickup & delivery</p>
+        <p className="text-xs text-slate-500">
+          {deliveryFeeDetail(order) ?? "Worked out from the map once the shop location is set (Riders page)."}
+          {order.delivery_distance_source === "straight_line" ? " (straight line: road routing was unavailable)" : ""}
+        </p>
+      </div>
+      {order.delivery_fee === null ? (
+        <Badge text="Distance pending" tone="amber" />
+      ) : (
+        <span className="w-24 text-right text-sm font-semibold tabular-nums">{formatKES(Number(order.delivery_fee))}</span>
+      )}
+    </div>
+  );
+}
+
 type OrderCardProps = {
   order: ApiOrder;
   alert: OrderAlert | null;
@@ -197,9 +221,13 @@ function OrderCard({ order, alert, riders, onSaved }: OrderCardProps) {
   };
   const dirty = Object.keys(drafts).length > 0;
   const needsPricing = !isOrderFullyMeasured(order);
+  const payment = paymentBadge(order);
 
   const nextStatus = ORDER_FLOW[ORDER_FLOW.indexOf(order.status) + 1];
-  const blockedByPricing = needsPricing && ["ready", "out_for_delivery", "delivered"].includes(nextStatus);
+  // The customer needs a final price (items + delivery fee) before the order is ready.
+  const blockedByPricing = !isOrderPriced(order) && ["ready", "out_for_delivery", "delivered"].includes(nextStatus);
+  // Clothes only leave the shop once the customer has paid in full.
+  const blockedByPayment = ["out_for_delivery", "delivered"].includes(nextStatus) && order.payment_status !== "paid";
 
   async function saveMeasurements() {
     const items: MeasurementInput[] = [];
@@ -336,8 +364,13 @@ function OrderCard({ order, alert, riders, onSaved }: OrderCardProps) {
         })}
       </ul>
 
+      <DeliveryFeeRow order={order} />
+
       <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
-        <span className="font-semibold">Saved total</span>
+        <span className="flex items-center gap-2 font-semibold">
+          Saved total
+          {payment ? <Badge text={payment.text} tone={payment.tone} /> : null}
+        </span>
         <span className="font-semibold tabular-nums text-blue-700">{orderTotalLabel(order)}</span>
       </div>
 
@@ -385,8 +418,18 @@ function OrderCard({ order, alert, riders, onSaved }: OrderCardProps) {
             className={secondaryButtonClass}
             type="button"
             onClick={advance}
-            disabled={busy || blockedByPricing || dirty}
-            title={blockedByPricing ? "Weigh or count every item first" : dirty ? "Save measurements first" : undefined}
+            disabled={busy || blockedByPricing || blockedByPayment || dirty}
+            title={
+              blockedByPricing
+                ? needsPricing
+                  ? "Weigh or count every item first"
+                  : "Waiting for the delivery distance (set the shop location)"
+                : blockedByPayment
+                  ? "Waiting for the customer to pay"
+                  : dirty
+                    ? "Save measurements first"
+                    : undefined
+            }
           >
             {nextStepLabels[nextStatus]}
           </button>
@@ -450,6 +493,11 @@ export function ShopScreen() {
           orders
             ? `${orders.length} active order${orders.length === 1 ? "" : "s"} · ${awaiting} waiting to be weighed. Saved weights show up for the customer right away.`
             : "Weigh incoming laundry, dispatch riders and update order status."
+        }
+        action={
+          <Link href="/shop/map" className={secondaryButtonClass}>
+            Live map
+          </Link>
         }
       />
 

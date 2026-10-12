@@ -32,6 +32,8 @@ export const PAGE_ACCESS: { prefix: string; roles: Role[] }[] = [
   { prefix: "/rider", roles: ["rider"] },
   // More specific prefixes must come before /shop: the first match wins.
   { prefix: "/shop/pricing", roles: ["admin"] },
+  { prefix: "/shop/payments", roles: ["admin"] },
+  { prefix: "/shop/riders", roles: ["admin"] },
   { prefix: "/shop", roles: ["staff", "admin"] },
   { prefix: "/profile", roles: ROLES },
   { prefix: "/support", roles: ROLES },

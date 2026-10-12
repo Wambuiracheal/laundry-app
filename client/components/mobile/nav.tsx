@@ -1,6 +1,6 @@
-import { HomeIcon, OrdersIcon, ProfileIcon, ServiceIcon, TruckIcon } from "@/components/mobile/icons";
+import { HomeIcon, OrdersIcon, ProfileIcon, ServiceIcon, StarRingIcon, TruckIcon } from "@/components/mobile/icons";
 
-export type NavSection = "home" | "services" | "orders" | "profile" | "jobs" | "shop" | "pricing";
+export type NavSection = "home" | "services" | "orders" | "profile" | "jobs" | "shop" | "pricing" | "payments" | "riders" | "map";
 
 /** Which tab set to show: customers, riders, shop staff, or admins (shop + pricing). */
 export type NavKind = "customer" | "rider" | "shop" | "admin";
@@ -15,12 +15,18 @@ export function appNavItems(active: NavSection, homeHref = "/customer-dashboard"
 
   const shop = { label: "Shop", icon: <OrdersIcon className="h-5 w-5" />, active: active === "shop", href: "/shop" };
 
+  const map = { label: "Map", icon: <TruckIcon className="h-5 w-5" />, active: active === "map", href: "/shop/map" };
+
   if (kind === "shop") {
-    return [shop, profile];
+    return [shop, map, profile];
   }
 
   if (kind === "admin") {
-    return [shop, { label: "Pricing", icon: <ServiceIcon className="h-5 w-5" />, active: active === "pricing", href: "/shop/pricing" }, profile];
+    return [shop, { label: "Pricing", icon: <ServiceIcon className="h-5 w-5" />, active: active === "pricing", href: "/shop/pricing" },
+      { label: "Payments", icon: <StarRingIcon className="h-5 w-5" />, active: active === "payments", href: "/shop/payments" },
+      { label: "Riders", icon: <TruckIcon className="h-5 w-5" />, active: active === "riders", href: "/shop/riders" },
+      profile,
+    ];
   }
 
   return [

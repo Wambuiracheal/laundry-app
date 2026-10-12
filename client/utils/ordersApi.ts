@@ -43,6 +43,12 @@ export type ApiOrder = {
   house_details: string | null;
   /** Directions for the rider: landmarks, what to tell the guard. */
   delivery_instructions: string | null;
+  /** One-way shop <-> customer distance; the fee covers two trips (pickup and delivery). */
+  delivery_distance_km: DecimalString | null;
+  delivery_distance_source: "road" | "straight_line" | null;
+  delivery_rate_per_km: DecimalString | null;
+  /** Pickup + delivery fee, included in total_amount; null until the distance is known. */
+  delivery_fee: DecimalString | null;
   status: OrderStatus;
   total_amount: DecimalString | null;
   remaining_amount: DecimalString | null;
@@ -148,6 +154,18 @@ export function assignRider(orderId: string, riderId: string | null) {
 }
 
 /** Log damage found at intake; the photo is optional. */
+/** Pickup + delivery price for a pinned address. Null when the shop location isn't set yet. */
+export type DeliveryQuote = {
+  delivery_distance_km: number;
+  delivery_distance_source: "road" | "straight_line";
+  delivery_rate_per_km: number;
+  delivery_fee: number;
+};
+
+export function fetchDeliveryQuote(lat: number, lng: number) {
+  return authRequest<DeliveryQuote | null>(`/api/orders/delivery-quote?lat=${lat}&lng=${lng}`);
+}
+
 export function logDamage(orderId: string, damage: { note: string; orderItemId: string | null; photo: File | null }) {
   const form = new FormData();
   form.set("note", damage.note);
@@ -195,6 +213,18 @@ export function isOrderFullyMeasured(order: ApiOrder) {
   return order.orderItems.length > 0 && order.orderItems.every(isMeasured);
 }
 
+/** Final price known: every item weighed/counted and the delivery fee set. The customer can pay. */
+export function isOrderPriced(order: ApiOrder) {
+  return isOrderFullyMeasured(order) && order.delivery_fee !== null;
+}
+
+/** e.g. "6.5 km each way · 2 trips × KES 650", or null while the distance is unknown. */
+export function deliveryFeeDetail(order: Pick<ApiOrder, "delivery_distance_km" | "delivery_rate_per_km">) {
+  if (order.delivery_distance_km === null || order.delivery_rate_per_km === null) return null;
+  const km = Number(order.delivery_distance_km);
+  return `${km} km each way · 2 trips × ${formatKES(Math.round(km * Number(order.delivery_rate_per_km)))}`;
+}
+
 export function rateLabel(service: ApiService) {
   const rate = formatKES(Number(service.base_price ?? 0));
   if (service.price_type === "per_kg") return `${rate} / kg`;
@@ -210,9 +240,20 @@ export function measurementLabel(item: ApiOrderItem) {
   return `${item.quantity} item${item.quantity === 1 ? "" : "s"}`;
 }
 
-/** Total label for lists: the confirmed total once everything is weighed, otherwise a pending note. */
+/** Payment state for an order once it has a final price, e.g. "Paid" or "KES 340 due". */
+export function paymentBadge(order: ApiOrder): { text: string; tone: "green" | "amber" } | null {
+  if (!isOrderPriced(order)) return null;
+  if (order.payment_status === "paid") return { text: "Paid", tone: "green" };
+  if (order.payment_status === "partial") {
+    return { text: `${formatKES(Number(order.remaining_amount ?? 0))} due`, tone: "amber" };
+  }
+  return { text: "Unpaid", tone: "amber" };
+}
+
+/** Total label for lists: the final total once priced, otherwise what it is waiting on. */
 export function orderTotalLabel(order: ApiOrder) {
-  return isOrderFullyMeasured(order) ? formatKES(Number(order.total_amount ?? 0)) : "Awaiting weighing";
+  if (isOrderPriced(order)) return formatKES(Number(order.total_amount ?? 0));
+  return isOrderFullyMeasured(order) ? "Delivery fee pending" : "Awaiting weighing";
 }
 
 export function serviceSummary(order: ApiOrder) {

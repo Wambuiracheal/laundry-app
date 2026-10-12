@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useCallback } from "react";
 import { CheckIcon, PlusIcon } from "@/components/mobile/icons";
 import { AppShell, Badge, PageHeading, SoftCard, primaryButtonClass, secondaryButtonClass } from "@/components/mobile/primitives";
 import { DamageList, DeliveryInstructions } from "@/components/mobile/OrderDetails";
 import { FormStatusMessage } from "@/components/shared/form/FormField";
+import { CustomerTrackingCard } from "@/components/maps/CustomerTrackingCard";
+import { PaymentCard } from "@/components/mobile/PaymentCard";
 import { usePolledData } from "@/hooks/usePolledData";
 import { formatKES } from "@/utils/currency";
 import {
@@ -16,10 +19,12 @@ import {
   fetchMyOrders,
   formatDateTime,
   isMeasured,
-  isOrderFullyMeasured,
+  deliveryFeeDetail,
+  isOrderPriced,
   measurementLabel,
   orderRef,
   orderTotalLabel,
+  paymentBadge,
   rateLabel,
   serviceSummary,
   type ApiOrder,
@@ -78,7 +83,8 @@ function Timeline({ order }: { order: ApiOrder }) {
 }
 
 function ItemsCard({ order }: { order: ApiOrder }) {
-  const measured = isOrderFullyMeasured(order);
+  const measured = isOrderPriced(order);
+  const payment = paymentBadge(order);
 
   return (
     <SoftCard className="lg:p-5">
@@ -111,10 +117,24 @@ function ItemsCard({ order }: { order: ApiOrder }) {
             </li>
           );
         })}
+        <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+          <div>
+            <p className="font-medium text-slate-800">Pickup & delivery</p>
+            <p className="text-xs text-slate-500">{deliveryFeeDetail(order) ?? "Being worked out from the map"}</p>
+          </div>
+          {order.delivery_fee !== null ? (
+            <span className="font-semibold tabular-nums">{formatKES(Number(order.delivery_fee))}</span>
+          ) : (
+            <Badge text="Pending" tone="amber" />
+          )}
+        </li>
       </ul>
 
       <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3">
-        <span className="text-sm font-semibold">Total</span>
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          Total
+          {payment ? <Badge text={payment.text} tone={payment.tone} /> : null}
+        </span>
         <span className={`text-base font-semibold tabular-nums ${measured ? "text-blue-700" : "text-slate-500"}`}>{orderTotalLabel(order)}</span>
       </div>
     </SoftCard>
@@ -149,7 +169,11 @@ function OrderSwitcher({ orders, selectedId }: { orders: ApiOrder[]; selectedId:
 
 export function OrderTrackingScreen() {
   const requestedId = useSearchParams().get("id");
-  const { data: orders, error, loading } = usePolledData(fetchMyOrders, ORDER_POLL_INTERVAL_MS);
+  const { data: orders, error, loading, setData } = usePolledData(fetchMyOrders, ORDER_POLL_INTERVAL_MS);
+  // After a successful M-Pesa payment, reload right away instead of waiting for the next poll.
+  const refreshOrders = useCallback(() => {
+    fetchMyOrders().then(setData, () => undefined);
+  }, [setData]);
 
   const order =
     orders?.find((candidate) => candidate.id === requestedId) ??
@@ -177,7 +201,9 @@ export function OrderTrackingScreen() {
 
           <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:space-y-0">
             <div className="space-y-4">
+              <CustomerTrackingCard key={`tracking-${order.id}`} orderId={order.id} />
               <ItemsCard order={order} />
+              <PaymentCard key={order.id} order={order} onPaid={refreshOrders} />
 
               <SoftCard className="lg:p-5">
                 <h2 className="text-base font-semibold">Pickup</h2>
