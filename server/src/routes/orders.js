@@ -1,8 +1,219 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const { requireAuth, requireRole } = require('../middlewares/auth');
+const { publishEvent } = require('../utils/redis');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const ORDER_STATUSES = ['pending_pickup', 'picked_up', 'processing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
+const MAX_WEIGHT_KG = 500;
+const MAX_ITEM_COUNT = 1000;
+
+const trackedOrderInclude = {
+  orderItems: { include: { service: true } },
+  statusHistory: { orderBy: { timestamp: 'asc' } },
+};
+
+const roundMoney = (value) => Math.round(value * 100) / 100;
+
+// Best effort: a missing Redis connection must not fail the request.
+const notifyOrderUpdated = (order) =>
+  publishEvent('laundry-events', { type: 'order.updated', orderId: order.id, status: order.status }).catch(() => undefined);
+
+// customer: request a pickup. Only the services are chosen here; the shop weighs/counts
+// the clothes on arrival and prices each item via PATCH /:id/measure.
+router.post('/request', requireAuth, async (req, res) => {
+  try {
+    const { service_ids, pickup_address, pickup_time, notes } = req.body;
+
+    const serviceIds = Array.isArray(service_ids) ? [...new Set(service_ids.filter((id) => typeof id === 'string'))] : [];
+    if (serviceIds.length === 0) {
+      return res.status(400).json({ error: 'Select at least one service' });
+    }
+
+    const address = typeof pickup_address === 'string' ? pickup_address.trim() : '';
+    if (!address || address.length > 191) {
+      return res.status(400).json({ error: 'A pickup address of up to 191 characters is required' });
+    }
+
+    const pickupTime = new Date(pickup_time);
+    if (Number.isNaN(pickupTime.getTime()) || pickupTime < new Date()) {
+      return res.status(400).json({ error: 'Choose a pickup time in the future' });
+    }
+
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : '';
+    if (trimmedNotes.length > 1000) {
+      return res.status(400).json({ error: 'Notes must be 1000 characters or fewer' });
+    }
+
+    const services = await prisma.service.findMany({ where: { id: { in: serviceIds } } });
+    if (services.length !== serviceIds.length) {
+      return res.status(400).json({ error: 'One or more selected services do not exist' });
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        user_id: req.user.userId,
+        pickup_address: address,
+        pickup_time: pickupTime,
+        notes: trimmedNotes || null,
+        status: 'pending_pickup',
+        payment_status: 'pending',
+        orderItems: { create: services.map((service) => ({ service_id: service.id, quantity: 0 })) },
+        statusHistory: { create: { status: 'pending_pickup', changed_by: req.user.role || 'customer' } },
+      },
+      include: trackedOrderInclude,
+    });
+
+    notifyOrderUpdated(order);
+    res.status(201).json(order);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create order', details: error.message });
+  }
+});
+
+// customer: their own orders, newest first
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { user_id: req.user.userId },
+      include: trackedOrderInclude,
+      orderBy: { created_at: 'desc' },
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
+  }
+});
+
+// shop staff: every order that is still in progress
+router.get('/queue', requireAuth, requireRole('staff', 'admin'), async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { status: { notIn: ['delivered', 'cancelled'] } },
+      include: {
+        ...trackedOrderInclude,
+        user: { select: { first_name: true, last_name: true, phone: true, email: true } },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch order queue', details: error.message });
+  }
+});
+
+// shop staff: record the measured weight (per-kg services) or item count (per-item services)
+// and recompute each item's price and the order total.
+router.patch('/:id/measure', requireAuth, requireRole('staff', 'admin'), async (req, res) => {
+  try {
+    const updates = Array.isArray(req.body.items) ? req.body.items : [];
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Provide at least one item measurement' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { orderItems: { include: { service: true } } },
+    });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const itemData = new Map();
+    for (const update of updates) {
+      const item = order.orderItems.find((orderItem) => orderItem.id === update.id);
+      if (!item) {
+        return res.status(400).json({ error: `Item ${update.id} does not belong to this order` });
+      }
+
+      const rate = Number(item.service.base_price ?? 0);
+      if (item.service.price_type === 'per_kg') {
+        const weight = Number(update.weight_kg);
+        if (!Number.isFinite(weight) || weight < 0 || weight > MAX_WEIGHT_KG) {
+          return res.status(400).json({ error: `Enter a weight between 0 and ${MAX_WEIGHT_KG} kg for ${item.service.name}` });
+        }
+        itemData.set(item.id, { weight_kg: weight, quantity: 0, price: roundMoney(rate * weight) });
+      } else if (item.service.price_type === 'fixed') {
+        itemData.set(item.id, { quantity: 1, price: roundMoney(rate) });
+      } else {
+        const quantity = Number(update.quantity);
+        if (!Number.isInteger(quantity) || quantity < 0 || quantity > MAX_ITEM_COUNT) {
+          return res.status(400).json({ error: `Enter a whole number of items for ${item.service.name}` });
+        }
+        itemData.set(item.id, { quantity, price: roundMoney(rate * quantity) });
+      }
+    }
+
+    const prices = order.orderItems.map((item) => (itemData.has(item.id) ? itemData.get(item.id).price : item.price));
+    const allMeasured = prices.every((price) => price !== null);
+    const total = roundMoney(prices.reduce((sum, price) => sum + Number(price ?? 0), 0));
+    const deposit = Number(order.deposit_amount ?? 0);
+    // Once everything is weighed the clothes go into the wash.
+    const nextStatus = allMeasured && ['pending_pickup', 'picked_up'].includes(order.status) ? 'processing' : order.status;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const [id, data] of itemData) {
+        await tx.orderItem.update({ where: { id }, data });
+      }
+
+      if (nextStatus !== order.status) {
+        await tx.orderStatusHistory.create({
+          data: { order_id: order.id, status: nextStatus, changed_by: req.user.role },
+        });
+      }
+
+      return tx.order.update({
+        where: { id: order.id },
+        data: {
+          total_amount: total,
+          remaining_amount: roundMoney(Math.max(total - deposit, 0)),
+          status: nextStatus,
+        },
+        include: trackedOrderInclude,
+      });
+    });
+
+    notifyOrderUpdated(updated);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record measurements', details: error.message });
+  }
+});
+
+// shop staff: move an order along its lifecycle
+router.patch('/:id/status', requireAuth, requireRole('staff', 'admin'), async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!ORDER_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${ORDER_STATUSES.join(', ')}` });
+    }
+
+    const existing = await prisma.order.findUnique({ where: { id: req.params.id }, include: { orderItems: true } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (existing.status === status) {
+      return res.status(400).json({ error: `Order is already ${status}` });
+    }
+    // The customer must see a final price before the clothes leave the shop.
+    const needsPrice = ['ready', 'out_for_delivery', 'delivered'].includes(status);
+    if (needsPrice && existing.orderItems.some((item) => item.price === null)) {
+      return res.status(400).json({ error: 'Weigh or count every item before marking the order as ' + status });
+    }
+
+    const [, order] = await prisma.$transaction([
+      prisma.orderStatusHistory.create({ data: { order_id: existing.id, status, changed_by: req.user.role } }),
+      prisma.order.update({ where: { id: existing.id }, data: { status }, include: trackedOrderInclude }),
+    ]);
+
+    notifyOrderUpdated(order);
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update order status', details: error.message });
+  }
+});
 
 // get all orders
 router.get('/', async (req, res) => {

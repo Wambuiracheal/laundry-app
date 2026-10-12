@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { BackIcon, BellIcon } from "@/components/mobile/icons";
 import { appNavItems, type NavSection } from "@/components/mobile/nav";
 import { UserAvatar } from "@/components/mobile/SessionUser";
+import  Logo  from "@/public/mobile/logo.png";
 
 export type NavItem = { label: string; icon: ReactNode; active?: boolean; href?: string };
 
@@ -13,7 +15,7 @@ export const secondaryButtonClass =
   "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50";
 
 export function BrandMark({ className = "h-8 w-8" }: { className?: string }) {
-  return <span className={`inline-block shrink-0 rounded-xl bg-[linear-gradient(150deg,#5eead4,#22d3ee_45%,#2563eb)] ${className}`} />;
+  return <Image src={Logo} alt="Panda Laundry" className={className} />;
 }
 
 /**

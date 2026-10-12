@@ -35,5 +35,6 @@ export const config = {
     "/cancel-order/:path*",
     "/cancel-pickup/:path*",
     "/reschedule/:path*",
+    "/shop/:path*",
   ],
 };

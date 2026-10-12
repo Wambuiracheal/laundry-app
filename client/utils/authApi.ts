@@ -14,6 +14,7 @@ export type AuthResponse = {
     id: string;
     fullName?: string;
     email: string;
+    role?: string;
   };
 };
 

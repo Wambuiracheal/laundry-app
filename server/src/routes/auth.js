@@ -1,9 +1,9 @@
 const express = require('express');
 const { V2 } = require("paseto");
-const nacl = require("tweetnacl");
 const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
 const { PrismaClient } = require('@prisma/client');
+const { privateKey, publicKey, signAccessToken } = require('../utils/tokens');
 const {
   validateSignupRequest,
   validateLoginRequest,
@@ -17,23 +17,6 @@ const prisma = new PrismaClient();
 
 const REFRESH_TOKEN_EXPIRES_DAYS = 7;
 
-/**
- * SECURITY WARNING: 
- * These keys change every time the server restarts. 
- * For Postman testing this is fine, but in production, 
- * save a fixed key to your .env file.
- */
-const keyPair = nacl.sign.keyPair(); 
-const privateKey = Buffer.from(keyPair.secretKey);
-const publicKey = Buffer.from(keyPair.publicKey);
-
-
-const signAccessToken = (userId, role) =>
-  V2.sign({ userId, role }, privateKey, {
-    issuer: "my-app",
-    audience: "users",
-    expiresIn: "1h",
-  });
 
 const createRefreshToken = async (userId) => {
   const raw = crypto.randomBytes(40).toString("hex");
@@ -92,7 +75,7 @@ router.post("/signup", validateSignupRequest, async (req, res) => {
       message: "User created",
       accessToken,
       refreshToken,
-      user: { id: newUser.id, fullName, email: newUser.email },
+      user: { id: newUser.id, fullName, email: newUser.email, role: newUser.role },
     });
 
   } catch (err) {
@@ -123,7 +106,11 @@ router.post("/login", validateLoginRequest, async (req, res) => {
     const accessToken = await signAccessToken(user.id, user.role || "user");
     const refreshToken = await createRefreshToken(user.id);
 
-    res.json({ accessToken, refreshToken });
+    res.json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, fullName: `${user.first_name} ${user.last_name}`.trim(), email: user.email, role: user.role },
+    });
 
   } catch (err) {
     console.error("Login failed:", err);
@@ -231,4 +218,4 @@ router.use((req, res) => {
   });
 });
 
-module.exports = router;
+module.exports = router;

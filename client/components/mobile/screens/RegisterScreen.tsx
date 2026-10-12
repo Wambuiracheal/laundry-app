@@ -72,6 +72,7 @@ export function RegisterScreen() {
                 refreshToken: result.refreshToken,
                 email: result.user?.email ?? values.email.trim(),
                 fullName: result.user?.fullName ?? values.fullName.trim(),
+                role: result.user?.role ?? values.role,
             });
             setStatus("Account created. Redirecting...");
             router.replace("/customer-dashboard");

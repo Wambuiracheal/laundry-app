@@ -57,7 +57,8 @@ model Order {
   pickup_lng        Float?
   pickup_time       DateTime?
   delivery_time     DateTime?
-  status            String
+  status            String      // pending_pickup | picked_up | processing | ready | out_for_delivery | delivered | cancelled
+  notes             String?     @db.Text
   deposit_amount    Decimal?
   total_amount      Decimal?
   remaining_amount  Decimal?
@@ -80,7 +81,8 @@ model OrderItem {
   service_id String
   service    Service  @relation(fields: [service_id], references: [id])
   quantity   Int      @default(1)
-  price      Decimal?
+  weight_kg  Decimal? // per-kg services: set when the shop weighs the clothes
+  price      Decimal? // null until the shop has weighed/counted the items
 }
 
 model Payment {

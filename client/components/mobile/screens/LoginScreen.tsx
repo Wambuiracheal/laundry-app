@@ -56,7 +56,13 @@ export function LoginScreen() {
             setIsSubmitting(true);
             setStatus(null);
             const result = await login(values);
-            saveSession({ accessToken: result.accessToken, refreshToken: result.refreshToken, email: values.email.trim() });
+            saveSession({
+                accessToken: result.accessToken,
+                refreshToken: result.refreshToken,
+                email: result.user?.email ?? values.email.trim(),
+                fullName: result.user?.fullName,
+                role: result.user?.role,
+            });
             setStatus("Login successful. Redirecting...");
             router.replace(safeNextPath(new URLSearchParams(window.location.search).get("next")));
         } catch (error) {

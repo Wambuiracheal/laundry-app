@@ -16,6 +16,8 @@ export type Session = {
   refreshToken?: string;
   email: string;
   fullName?: string;
+  // customer | admin | rider | staff
+  role?: string;
 };
 
 export function saveSession(session: Session) {
