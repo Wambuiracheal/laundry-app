@@ -1,4 +1,7 @@
 node_modules
 .env
+# Other env files (e.g. .env.supabase) hold real credentials too
+.env.*
+!.env.example
 /generated/prisma
 ENDPOINTS.md
