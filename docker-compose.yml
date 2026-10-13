@@ -1,18 +1,18 @@
 services:
-  mysql:
-    image: mysql:8.4
+  # Same database engine as production (Supabase is PostgreSQL).
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: laundry_db
-      MYSQL_USER: laundry_user
-      MYSQL_PASSWORD: laundry_pass
-      MYSQL_ROOT_PASSWORD: root_pass
+      POSTGRES_DB: laundry_db
+      POSTGRES_USER: laundry_user
+      POSTGRES_PASSWORD: laundry_pass
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_pass"]
+      test: ["CMD-SHELL", "pg_isready -U laundry_user -d laundry_db"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,13 +32,19 @@ services:
     build:
       context: ./server
     restart: unless-stopped
+    # Optional local settings such as the Firebase credentials. Values under `environment`
+    # take precedence, so the container keeps using the compose database and Redis.
+    env_file:
+      - path: ./server/.env
+        required: false
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql://laundry_user:laundry_pass@mysql:3306/laundry_db
+      DATABASE_URL: postgresql://laundry_user:laundry_pass@postgres:5432/laundry_db
+      DIRECT_URL: postgresql://laundry_user:laundry_pass@postgres:5432/laundry_db
       BE_PORT: 5000
       SESSION_SECRET: replace-with-a-strong-secret
       REDIS_URL: redis://redis:6379
@@ -60,4 +66,4 @@ services:
       - "3000:3000"
 
 volumes:
-  mysql_data:
+  postgres_data:

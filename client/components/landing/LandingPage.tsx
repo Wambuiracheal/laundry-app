@@ -272,7 +272,7 @@ export function LandingPage() {
               </div>
               <div className="mt-6 flex items-center justify-between gap-4 md:mt-0 md:flex-col md:items-end">
                 <p className="text-3xl font-semibold">
-                  $49.99<span className="text-sm font-medium text-slate-500"> /mo</span>
+                  KES 4,999<span className="text-sm font-medium text-slate-500"> /mo</span>
                 </p>
                 <Link href="/register" className={primaryCta}>
                   Get started

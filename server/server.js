@@ -4,7 +4,8 @@ const { PrismaClient } = require('@prisma/client');
 const { initRedis } = require('./src/utils/redis');
 
 const prisma = new PrismaClient();
-const PORT = process.env.BE_PORT || 5000;
+// Render (and most hosts) assign the port through PORT; BE_PORT is the local/Docker setting.
+const PORT = process.env.PORT || process.env.BE_PORT || 5000;
 
 async function startServer() {
   try {
@@ -25,7 +26,7 @@ async function startServer() {
   } catch (error) {
     console.error('Server failed to start:');
     console.error(error.message);
-    console.log('TIP: Ensure MySQL and Redis are running and .env credentials are correct.');
+    console.log('TIP: Ensure PostgreSQL is reachable and DATABASE_URL in .env is correct.');
     process.exit(1);
   }
 }

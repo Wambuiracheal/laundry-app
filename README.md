@@ -1,6 +1,6 @@
 # Panda Laundry
 
-A laundry pickup-and-delivery platform. Customers book pickups, choose services (wash & fold, dry cleaning, ironing, etc.), track orders, and manage requests such as rescheduling or cancelling. The repository is a monorepo with a **Next.js** web client and an **Express + Prisma** REST API backed by **MySQL** and **Redis**.
+A laundry pickup-and-delivery platform. Customers book pickups, choose services (wash & fold, dry cleaning, ironing, etc.), track orders, and manage requests such as rescheduling or cancelling. The repository is a monorepo with a **Next.js** web client and an **Express + Prisma** REST API backed by **PostgreSQL** (Supabase in production) and optional **Redis**. See [DEPLOY.md](DEPLOY.md) for hosting on Supabase, Render and Netlify.
 
 ---
 
@@ -25,7 +25,7 @@ A laundry pickup-and-delivery platform. Customers book pickups, choose services 
 
 ## Architecture
 
-The app is a classic three-tier setup: a browser client, a stateless REST API, and a data layer (MySQL for persistent data, Redis for sessions, caching and pub/sub).
+The app is a classic three-tier setup: a browser client, a stateless REST API, and a data layer (PostgreSQL for persistent data, optional Redis for caching and pub/sub).
 
 ```mermaid
 flowchart LR
@@ -47,7 +47,7 @@ flowchart LR
         RU["Redis utils<br/>cache · session store · pub/sub"]
     end
 
-    DB[("MySQL 8.4<br/>laundry_db")]
+    DB[("PostgreSQL 16<br/>laundry_db")]
     RD[("Redis 7")]
 
     UI -->|page request| PX --> SSR
@@ -65,9 +65,9 @@ flowchart LR
 | --- | --- |
 | **Client rendering** | Next.js App Router. Thin `app/*/page.tsx` route files render screen components from `components/`. |
 | **Route protection (client)** | `client/proxy.ts` (Next.js 16's replacement for `middleware.ts`) checks for a `pl_session` presence cookie and redirects signed-out users to `/login?next=...`. It's an optimistic check only. The API is the source of truth. |
-| **Auth tokens** | Short-lived **PASETO v2** access tokens (1h, Ed25519-signed via `tweetnacl`) plus opaque **refresh tokens** (7 days) stored as SHA-256 hashes in MySQL and **rotated** on every refresh. |
+| **Auth tokens** | Short-lived **PASETO v2** access tokens (1h, Ed25519-signed via `tweetnacl`) plus opaque **refresh tokens** (7 days) stored as SHA-256 hashes in PostgreSQL and **rotated** on every refresh. |
 | **Passwords** | Hashed with `bcrypt`. |
-| **Data access** | Prisma ORM over MySQL, with versioned SQL migrations in `server/prisma/migrations`. |
+| **Data access** | Prisma ORM over PostgreSQL, with versioned SQL migrations in `server/prisma/migrations`. |
 | **Caching** | Redis read-through cache (e.g. `GET /api/services` cached for 60s under `services:all`). Cache helpers fail soft, so the API keeps working if Redis is down. |
 | **Sessions** | `express-session` with a `connect-redis` store (prefix `laundry:sess:`). |
 | **Events** | Redis pub/sub on the `laundry-events` channel. The server subscribes at startup and logs incoming events. |
@@ -105,8 +105,8 @@ flowchart LR
 | [Node.js](https://nodejs.org) | 20 | Runtime |
 | [Express](https://expressjs.com) | 5 | HTTP framework |
 | [Prisma](https://www.prisma.io) | 5.22 | ORM, migrations |
-| [MySQL](https://www.mysql.com) | 8.4 | Primary database |
-| [Redis](https://redis.io) (`redis` client) | 7 / 6.x | Cache, session store, pub/sub |
+| [PostgreSQL](https://www.postgresql.org) | 16 | Primary database (Supabase in production) |
+| [Redis](https://redis.io) (`redis` client) | 7 / 6.x | Optional: cache, session store, pub/sub |
 | `express-session` + `connect-redis` | — | Server sessions in Redis |
 | `paseto` + `tweetnacl` | — | Signed access tokens (PASETO v2.public) |
 | `bcrypt` | 6 | Password hashing |
@@ -118,7 +118,8 @@ flowchart LR
 | Tool | Purpose |
 | --- | --- |
 | Docker (multi-stage, `node:20-alpine`) | Container images for client and server |
-| Docker Compose | Local orchestration of `mysql`, `redis`, `server`, `client` with health checks |
+| Docker Compose | Local orchestration of `postgres`, `redis`, `server`, `client` with health checks |
+| Render, Netlify, Supabase | Production hosting for the API, the web client and the database ([DEPLOY.md](DEPLOY.md)) |
 
 ---
 
@@ -126,7 +127,10 @@ flowchart LR
 
 ```text
 laundry-app/
-├── docker-compose.yml            # mysql + redis + server + client
+├── docker-compose.yml            # postgres + redis + server + client
+├── render.yaml                   # Render Blueprint for the API
+├── netlify.toml                  # Netlify build for the client
+├── DEPLOY.md                     # Supabase + Render + Netlify guide
 ├── README.md
 │
 ├── client/                       # Next.js web app
@@ -188,7 +192,7 @@ laundry-app/
 ### Prerequisites
 
 - **Docker** and **Docker Compose** (for Option A), or
-- **Node.js 20+**, **npm**, **MySQL 8**, and **Redis 7** (for Option B)
+- **Node.js 20+**, **npm** and **PostgreSQL 16** (for Option B); Redis 7 is optional
 
 ```bash
 git clone https://github.com/Wambuiracheal/laundry-app.git
@@ -205,10 +209,10 @@ docker compose up --build
 | --- | --- |
 | Web client | http://localhost:3000 |
 | API | http://localhost:5000 |
-| MySQL | `localhost:3306` (`laundry_user` / `laundry_pass`, db `laundry_db`) |
+| PostgreSQL | `localhost:5432` (`laundry_user` / `laundry_pass`, db `laundry_db`) |
 | Redis | `localhost:6379` |
 
-The server container waits for MySQL and Redis health checks, then runs `prisma migrate deploy` before starting.
+The server container waits for the PostgreSQL and Redis health checks, then runs `prisma migrate deploy` before starting.
 
 > `NEXT_PUBLIC_API_BASE_URL` is baked into the client **at build time**. If you change the API URL, rebuild with `docker compose build client`.
 
@@ -217,7 +221,7 @@ Useful commands:
 ```bash
 docker compose logs -f server            # tail API logs
 docker compose down                      # stop containers
-docker compose down -v                   # stop and wipe the MySQL volume
+docker compose down -v                   # stop and wipe the database volume
 ```
 
 ### Option B: Run locally
@@ -225,7 +229,7 @@ docker compose down -v                   # stop and wipe the MySQL volume
 You can still run just the databases in Docker:
 
 ```bash
-docker compose up -d mysql redis
+docker compose up -d postgres redis
 ```
 
 **1. Backend**
@@ -258,10 +262,13 @@ Open http://localhost:3000/preview for a hub that links to every screen.
 
 | Variable | Example | Description |
 | --- | --- | --- |
-| `DATABASE_URL` | `mysql://laundry_user:laundry_pass@localhost:3306/laundry_db` | Prisma MySQL connection string |
-| `BE_PORT` | `5000` | API port |
+| `DATABASE_URL` | `postgresql://laundry_user:laundry_pass@localhost:5432/laundry_db` | PostgreSQL connection the app queries through |
+| `DIRECT_URL` | same as `DATABASE_URL` locally | Connection used by `prisma migrate` (Supabase session pooler in production) |
+| `BE_PORT` / `PORT` | `5000` | API port (`PORT` wins; hosts like Render set it) |
+| `CLIENT_URL` | `https://your-site.netlify.app` | Origins allowed by CORS, comma-separated; unset allows any |
+| `TOKEN_SIGNING_SEED` | 32+ random characters | Keeps access tokens valid across restarts |
 | `SESSION_SECRET` | `a-long-random-string` | Secret for `express-session` |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL (takes precedence) |
+| `REDIS_URL` | `redis://localhost:6379` | Optional Redis connection URL (takes precedence); unset runs without Redis |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Alternative to `REDIS_URL` |
 
 ### Client (`client/.env.local`)
@@ -373,7 +380,7 @@ sequenceDiagram
     participant B as Browser
     participant P as proxy.ts
     participant A as Express API
-    participant D as MySQL
+    participant D as PostgreSQL
 
     B->>A: POST /api/auth/login
     A->>D: find user and check bcrypt hash

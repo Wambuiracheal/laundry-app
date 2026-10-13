@@ -1,7 +1,13 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 
+const { requireAuth, requireRole } = require('../middlewares/auth');
+const { ROLES } = require('../utils/roles');
+
 const router = express.Router();
+
+// Raw table access is admin only; customer/rider/shop flows go through /api/orders.
+router.use(requireAuth, requireRole(ROLES.ADMIN));
 const prisma = new PrismaClient();
 
 // get all order status history

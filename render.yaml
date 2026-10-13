@@ -1,0 +1,60 @@
+# Render Blueprint for the API (Dashboard > New > Blueprint, pick this repo).
+# Secrets marked `sync: false` are asked for when the Blueprint is created; fill them in from
+# Supabase, Netlify, Daraja and Firebase. See DEPLOY.md.
+services:
+  - type: web
+    name: panda-laundry-api
+    runtime: node
+    rootDir: server
+    plan: free
+    # Closest Render region to Kenya; pick the Supabase region to match (eu-central-1).
+    region: frankfurt
+    # --include=dev: the Prisma CLI is a dev dependency and NODE_ENV=production would skip it.
+    buildCommand: npm ci --include=dev && npx prisma generate
+    # Applies any pending migrations to Supabase, then starts the API.
+    startCommand: npx prisma migrate deploy && node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Supabase > Connect: Transaction pooler (port 6543) + ?pgbouncer=true&connection_limit=1
+      - key: DATABASE_URL
+        sync: false
+      # Supabase > Connect: Session pooler (port 5432), used for migrations
+      - key: DIRECT_URL
+        sync: false
+      # The Netlify site URL, e.g. https://panda-laundry.netlify.app (comma-separate several)
+      - key: CLIENT_URL
+        sync: false
+      - key: TOKEN_SIGNING_SEED
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      # M-Pesa (Daraja). Keep sandbox until you have production credentials.
+      - key: MPESA_ENV
+        value: sandbox
+      - key: MPESA_SHORTCODE
+        value: "174379"
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      # This service's own URL, e.g. https://panda-laundry-api.onrender.com, so Daraja can
+      # send payment results (and M-Pesa receipt codes) straight to the API.
+      - key: MPESA_CALLBACK_BASE_URL
+        sync: false
+      - key: MPESA_CALLBACK_SECRET
+        generateValue: true
+      # Firebase Storage for damage photos (optional; uploads are off until set)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false

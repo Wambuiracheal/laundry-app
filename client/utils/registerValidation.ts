@@ -4,7 +4,6 @@ export type RegisterValues = {
   phone: string;
   password: string;
   confirmPassword: string;
-  role: string;
 };
 
 export type RegisterErrors = Partial<Record<keyof RegisterValues, string>>;
@@ -37,10 +36,6 @@ export function validateRegister(values: RegisterValues): RegisterErrors {
 
   if (values.confirmPassword !== values.password) {
     errors.confirmPassword = "Passwords do not match.";
-  }
-
-  if (isBlank(values.role)) {
-    errors.role = "Please select a role.";
   }
 
   return errors;

@@ -1,8 +1,13 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const { requireAuth, requireRole } = require('../middlewares/auth');
+const { ROLES } = require('../utils/roles');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// User management (including changing roles) is admin only.
+router.use(requireAuth, requireRole(ROLES.ADMIN));
 
 router.get('/', async (req, res) => {
   try {

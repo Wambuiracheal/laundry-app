@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { BackIcon, BellIcon } from "@/components/mobile/icons";
-import { appNavItems, type NavSection } from "@/components/mobile/nav";
+import { appNavItems, type NavKind, type NavSection } from "@/components/mobile/nav";
 import { UserAvatar } from "@/components/mobile/SessionUser";
+import  Logo  from "@/public/mobile/logo.png";
 
 export type NavItem = { label: string; icon: ReactNode; active?: boolean; href?: string };
 
@@ -13,7 +15,7 @@ export const secondaryButtonClass =
   "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50";
 
 export function BrandMark({ className = "h-8 w-8" }: { className?: string }) {
-  return <span className={`inline-block shrink-0 rounded-xl bg-[linear-gradient(150deg,#5eead4,#22d3ee_45%,#2563eb)] ${className}`} />;
+  return <Image src={Logo} alt="Panda Laundry" className={className} />;
 }
 
 /**
@@ -28,6 +30,7 @@ export function AppShell({
   title,
   backHref,
   backLabel = "Back",
+  nav = "customer",
 }: {
   active: NavSection;
   children: ReactNode;
@@ -37,8 +40,10 @@ export function AppShell({
   title?: string;
   backHref?: string;
   backLabel?: string;
+  /** Tab set for the signed-in role. */
+  nav?: NavKind;
 }) {
-  const items = appNavItems(active, homeHref);
+  const items = appNavItems(active, homeHref, nav);
 
   return (
     <div className={`min-h-screen w-full ${dark ? "bg-[#0a1424] text-slate-100" : "bg-slate-50 text-slate-900"}`}>
@@ -145,9 +150,9 @@ export function MobileBottomNav({ items, dark = false, className = "" }: { items
         dark ? "border-slate-800 bg-[#081223]/90" : "border-slate-200 bg-white/90"
       } ${className}`}
     >
-      <ul className="mx-auto grid h-16 max-w-xl grid-cols-4 px-2 md:max-w-3xl">
+      <ul className="mx-auto flex h-16 max-w-xl px-2 md:max-w-3xl">
         {items.map((item) => (
-          <li key={item.label}>
+          <li key={item.label} className="flex-1">
             <Link
               href={item.href ?? "#"}
               className={`flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition ${
@@ -238,12 +243,13 @@ export function SoftCard({
   );
 }
 
-export function Badge({ text, tone = "green" }: { text: string; tone?: "green" | "blue" | "gray" | "amber" }) {
+export function Badge({ text, tone = "green" }: { text: string; tone?: "green" | "blue" | "gray" | "amber" | "red" }) {
   const styles = {
     green: "bg-emerald-100 text-emerald-800",
     blue: "bg-blue-100 text-blue-800",
     gray: "bg-slate-100 text-slate-700",
     amber: "bg-amber-100 text-amber-800",
+    red: "bg-rose-100 text-rose-800",
   } as const;
 
   return (

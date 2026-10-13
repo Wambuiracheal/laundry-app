@@ -1,6 +1,7 @@
 import { postJson } from "@/utils/apiClient";
 import type { LoginValues } from "@/utils/loginValidation";
 import type { RegisterValues } from "@/utils/registerValidation";
+import type { SignupRole } from "@/utils/roles";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
 const GOOGLE_LOGIN_PATH = process.env.NEXT_PUBLIC_GOOGLE_LOGIN_PATH ?? "/api/auth/login/google";
@@ -14,6 +15,7 @@ export type AuthResponse = {
     id: string;
     fullName?: string;
     email: string;
+    role?: string;
   };
 };
 
@@ -24,14 +26,14 @@ export async function login(payload: LoginValues): Promise<AuthResponse> {
   });
 }
 
-export async function signup(payload: RegisterValues): Promise<AuthResponse> {
+export async function signup(payload: RegisterValues, role: SignupRole = "customer"): Promise<AuthResponse> {
   return postJson<AuthResponse>("/api/auth/signup", {
     fullName: payload.fullName,
     email: payload.email,
     phone: payload.phone,
     password: payload.password,
     confirmPassword: payload.confirmPassword,
-    role: payload.role,
+    role,
   });
 }
 

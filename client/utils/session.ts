@@ -1,9 +1,10 @@
 import { postJson } from "@/utils/apiClient";
+import { canAccess, homeForRole, isRole } from "@/utils/roles";
 
 /**
- * Presence-only cookie read by `proxy.ts` to decide whether to show the app or send the
- * visitor to /login. It holds no credentials; the tokens live in localStorage and the API
- * remains the source of truth for authorization.
+ * Cookie read by `proxy.ts` to route the visitor: its value is the signed-in user's role, used
+ * to keep each role on its own pages. It holds no credentials; the tokens live in localStorage
+ * and the API remains the source of truth for authorization.
  */
 export const SESSION_COOKIE = "pl_session";
 
@@ -16,6 +17,8 @@ export type Session = {
   refreshToken?: string;
   email: string;
   fullName?: string;
+  // customer | rider | staff | admin
+  role?: string;
 };
 
 export function saveSession(session: Session) {
@@ -24,7 +27,7 @@ export function saveSession(session: Session) {
   } catch {
     // Storage can be unavailable (private mode); the cookie still gates navigation.
   }
-  document.cookie = `${SESSION_COOKIE}=1; Path=/; Max-Age=${MAX_AGE_SECONDS}; SameSite=Lax`;
+  document.cookie = `${SESSION_COOKIE}=${isRole(session.role) ? session.role : "unknown"}; Path=/; Max-Age=${MAX_AGE_SECONDS}; SameSite=Lax`;
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
@@ -77,4 +80,11 @@ export async function logout() {
 /** Only allow same-site relative paths as a post-login destination. */
 export function safeNextPath(value: string | null, fallback = "/customer-dashboard") {
   return value && value.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}
+
+/** Where to go after login: the requested page if this role may open it, otherwise the role's home. */
+export function postLoginPath(next: string | null, role: string | undefined) {
+  const home = homeForRole(role);
+  const target = safeNextPath(next, home);
+  return isRole(role) && canAccess(role, target.split("?")[0]) ? target : home;
 }
