@@ -17,6 +17,12 @@ async function initRedis() {
   const redisHost = process.env.REDIS_HOST;
   const redisPort = process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined;
 
+  // Redis is optional (caching and event publishing only); run without it when not configured.
+  if (!redisUrl && !redisHost) {
+    console.log('Redis not configured (no REDIS_URL): caching and event publishing are off.');
+    return null;
+  }
+
   // FIX 2: Only pass socket host/port if REDIS_URL is NOT provided
   const clientOptions = redisUrl
     ? { url: redisUrl }
@@ -67,15 +73,16 @@ async function initRedis() {
 }
 
 async function getRedisClient() {
-  if (!redisClient) {
+  if (!redisClient && (process.env.REDIS_URL || process.env.REDIS_HOST)) {
     await initRedis();
   }
   return redisClient;
 }
 
+/** Redis-backed session store, or null when Redis isn't available. */
 function createSessionStore() {
-  if (!redisClient) {
-    throw new Error('Redis client has not been initialized yet');
+  if (!redisClient || !redisReady) {
+    return null;
   }
 
   return new RedisStore({

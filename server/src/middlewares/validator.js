@@ -5,6 +5,9 @@ const phoneRegex = /^\+?[1-9]\d{1,14}$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 // This function validates the email and phone number formats using regular expressions. It throws an error if the email format is invalid or if the phone number format is invalid (if provided).
+// Emails are stored and looked up in lower case: PostgreSQL compares text case-sensitively.
+const normalizeEmail = (email) => (typeof email === 'string' ? email.trim().toLowerCase() : email);
+
 const validateEmailAndPhone = (email, phone) => {
   if (!emailRegex.test(email)) {
     throw new Error('Invalid email format');
@@ -26,7 +29,7 @@ const validatePasswordStrength = (password) => {
 const validateSignupRequest = (req, res, next) => {
   try {
     const fullName = req.body.fullName ?? req.body.full_name;
-    const email = req.body.email;
+    const email = normalizeEmail(req.body.email);
     const password = req.body.password ?? req.body.password_hash;
     const confirmPassword = req.body.confirmPassword ?? req.body.confirm_password;
     const phone = req.body.phone;
@@ -74,7 +77,7 @@ const validateSignupRequest = (req, res, next) => {
 // This middleware function validates the login request payload. It checks for required fields (email and password), reuses the email format validation, and attaches the validated payload to the request object for downstream handlers to use. If validation fails, it responds with a 400 status code and an error message.
 const validateLoginRequest = (req, res, next) => {
   try {
-    const email = req.body.email;
+    const email = normalizeEmail(req.body.email);
     const password = req.body.password;
 
     if (!email || !password) {

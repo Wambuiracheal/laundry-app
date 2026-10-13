@@ -1,8 +1,13 @@
 // This is your Prisma schema file
 
+// PostgreSQL (Supabase in production, the postgres container locally).
+// DATABASE_URL: what the app queries through. On Supabase, the transaction pooler (port 6543,
+// with ?pgbouncer=true). DIRECT_URL: used by `prisma migrate`, which needs a session connection.
+// On Supabase, the session pooler (port 5432). Locally both point at the same database.
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {

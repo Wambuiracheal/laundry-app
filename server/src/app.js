@@ -20,13 +20,25 @@ const actionsRoutes = require('./routes/actions');
 
 const app = express();
 
-app.use(cors());
+// Behind Render's proxy in production: trust it so req.ip and secure cookies reflect the client.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+// CLIENT_URL: comma-separated origins allowed to call the API (e.g. the Netlify site).
+// Left unset (local development), any origin is allowed.
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : undefined));
 app.use(express.json());
 
-// Synchronous configuration
-// We pass the store directly, assuming the client is initialized in server.js
-app.use(session({
-  store: createSessionStore(),
+// Sessions need Redis. No route reads req.session today (auth uses bearer tokens), so without
+// Redis the middleware is simply skipped.
+const sessionStore = createSessionStore();
+if (sessionStore) app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'dev-session-secret',
   resave: false,
   saveUninitialized: false,
