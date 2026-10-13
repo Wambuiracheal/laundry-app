@@ -1,6 +1,4 @@
 # Netlify build for the Next.js client (Add new site > Import from Git, pick this repo).
-# Netlify detects Next.js and runs it with its Next.js runtime, so pages, the proxy (route
-# protection) and server rendering all work without extra configuration.
 [build]
   base = "client"
   command = "npm run build"
@@ -12,3 +10,10 @@
   # Set NEXT_PUBLIC_API_BASE_URL in Site configuration > Environment variables to the Render
   # API URL (e.g. https://panda-laundry-api.onrender.com). It is baked in at build time, so
   # trigger a new deploy after changing it.
+
+# Netlify's Next.js runtime turns the `.next` build into pages and functions (server rendering
+# and the proxy that protects signed-in pages). Declared explicitly because auto-detection didn't
+# run for this site, which published `.next` as plain files and served 404s. The version is
+# pinned in client/package.json.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
