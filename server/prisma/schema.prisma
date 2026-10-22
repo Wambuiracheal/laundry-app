@@ -19,9 +19,12 @@ model User {
   id            String         @id @default(uuid())
   first_name    String
   last_name     String
+  // Supabase Auth user id (auth.users.id). Sign-in, passwords and social logins live in Supabase;
+  // this table holds the profile and the role, which only the backend can change.
+  auth_id       String?        @unique
   email         String         @unique
   phone         String
-  password_hash String
+  password_hash String?        // legacy: kept only for accounts not yet moved to Supabase
   role          String         // customer | admin | rider | staff
   sms_opt_in    Boolean        @default(true) // customers: text me when my order moves
   orders        Order[]        @relation("UserOrders")
@@ -31,7 +34,6 @@ model User {
   assignedOrders Order[]       @relation("AssignedRiderOrders")
   earnings      RiderEarning[] @relation("RiderEarnings")
   location      RiderLocation?
-  refreshTokens RefreshToken[]
   notifications Notification[]
 }
 
@@ -51,16 +53,6 @@ model Notification {
   created_at DateTime  @default(now())
 
   @@index([user_id, created_at])
-}
-
-model RefreshToken {
-  id         String   @id @default(uuid())
-  token_hash String   @unique
-  user_id    String
-  user       User     @relation(fields: [user_id], references: [id])
-  expires_at DateTime
-  revoked    Boolean  @default(false)
-  created_at DateTime @default(now())
 }
 
 
@@ -237,6 +229,8 @@ model SupportTicket {
   updated_at DateTime @updatedAt
 }
 
+// No longer written (password resets moved to Supabase Auth; reschedules change the order itself).
+// Kept so existing rows aren't lost; drop with a migration once they're not needed.
 model PasswordResetRequest {
   id         String   @id @default(uuid())
   email      String
@@ -244,6 +238,8 @@ model PasswordResetRequest {
   created_at DateTime @default(now())
 }
 
+// No longer written (password resets moved to Supabase Auth; reschedules change the order itself).
+// Kept so existing rows aren't lost; drop with a migration once they're not needed.
 model PickupRescheduleRequest {
   id          String   @id @default(uuid())
   pickup_date DateTime

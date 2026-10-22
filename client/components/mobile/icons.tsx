@@ -19,17 +19,6 @@ export function BellIcon(props: IconProps) {
   );
 }
 
-export function ShareIcon(props: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <circle cx="18" cy="5" r="2" />
-      <circle cx="6" cy="12" r="2" />
-      <circle cx="18" cy="19" r="2" />
-      <path d="m8 12 8-6m-8 0 8 6" />
-    </svg>
-  );
-}
-
 export function HomeIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
@@ -65,14 +54,6 @@ export function ProfileIcon(props: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5 20a7 7 0 0 1 14 0" />
-    </svg>
-  );
-}
-
-export function MinusIcon(props: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M5 12h14" />
     </svg>
   );
 }

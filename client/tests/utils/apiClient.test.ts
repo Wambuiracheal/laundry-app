@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { authRequest, postJson } from "@/utils/apiClient";
-import { clearSession, parseSession, readSessionSnapshot, saveSession } from "@/utils/session";
+import { ApiError, authRequest, browserNavigation, postJson } from "@/utils/apiClient";
+import { clearSession, logout, parseSession, readSessionSnapshot, saveSession } from "@/utils/session";
+import { fakeAuth } from "../supabaseMock";
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
 describe("session storage", () => {
-  it("stores the session and sets the role cookie", () => {
+  it("stores the profile and sets the role cookie", () => {
     const listener = vi.fn();
     window.addEventListener("pl-session-change", listener);
-    saveSession({ email: "jane@example.com", role: "customer", accessToken: "a" });
+    saveSession({ email: "jane@example.com", role: "customer" });
 
     expect(parseSession(readSessionSnapshot())).toMatchObject({ email: "jane@example.com", role: "customer" });
     expect(document.cookie).toContain("pl_session=customer");
@@ -30,12 +31,26 @@ describe("session storage", () => {
   it("returns null for corrupt stored JSON", () => {
     expect(parseSession("{not json")).toBeNull();
   });
+
+  it("logs out of Supabase and clears the profile, even when Supabase is unreachable", async () => {
+    saveSession({ email: "jane@example.com", role: "customer" });
+    await logout();
+    expect(fakeAuth.signOut).toHaveBeenCalled();
+    expect(readSessionSnapshot()).toBeNull();
+
+    saveSession({ email: "jane@example.com", role: "customer" });
+    fakeAuth.signOut.mockRejectedValueOnce(new Error("offline"));
+    await logout();
+    expect(readSessionSnapshot()).toBeNull();
+  });
 });
 
 describe("postJson", () => {
-  it("surfaces the API's error message", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(400, { error: "Email already registered" })));
-    await expect(postJson("/api/auth/register", {})).rejects.toThrow("Email already registered");
+  it("surfaces the API's error message and code", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(400, { error: "Email already registered", code: "taken" })));
+    const error = await postJson("/api/x", {}).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ message: "Email already registered", status: 400, code: "taken" });
   });
 
   it("falls back to the status code when the body has no error", async () => {
@@ -45,36 +60,58 @@ describe("postJson", () => {
 });
 
 describe("authRequest", () => {
-  it("sends the stored access token", async () => {
-    saveSession({ email: "jane@example.com", role: "customer", accessToken: "token-1" });
+  it("sends the Supabase access token", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(authRequest("/api/orders")).resolves.toEqual({ ok: true });
     const [, init] = fetchMock.mock.calls[0];
-    expect(init.headers).toEqual({ Authorization: "Bearer token-1" });
+    expect(init.headers).toEqual({ Authorization: "Bearer test-access-token" });
   });
 
-  it("refreshes once on 401 and retries with the new token", async () => {
-    saveSession({ email: "jane@example.com", role: "customer", accessToken: "old", refreshToken: "r-old" });
+  it("refreshes the Supabase session once on 401 and retries", async () => {
+    fakeAuth.refreshSession.mockResolvedValueOnce({ data: { session: { access_token: "fresh" } }, error: null });
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(401, { error: "expired" }))
-      .mockResolvedValueOnce(jsonResponse(200, { accessToken: "new", refreshToken: "r-new" }))
       .mockResolvedValueOnce(jsonResponse(200, { id: "o1" }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(authRequest("/api/orders/o1", { method: "PATCH", body: { notes: "hi" } })).resolves.toEqual({ id: "o1" });
-
-    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/auth\/refresh$/);
-    expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe("Bearer new");
-    expect(fetchMock.mock.calls[2][1].body).toBe(JSON.stringify({ notes: "hi" }));
-    expect(parseSession(readSessionSnapshot())).toMatchObject({ accessToken: "new", refreshToken: "r-new" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer fresh");
+    expect(fetchMock.mock.calls[1][1].body).toBe(JSON.stringify({ notes: "hi" }));
   });
 
-  it("reports an expired session when refresh is impossible", async () => {
-    saveSession({ email: "jane@example.com", role: "customer", accessToken: "old" });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, {})));
+  it("signs out and sends the visitor to login when there is no session", async () => {
+    const assign = vi.spyOn(browserNavigation, "assign").mockImplementation(() => {});
+    saveSession({ email: "jane@example.com", role: "customer" });
+    fakeAuth.session = null;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
     await expect(authRequest("/api/orders")).rejects.toThrow("Your session has expired. Please log in again.");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readSessionSnapshot()).toBeNull();
+    expect(assign).toHaveBeenCalledWith("/login?next=%2F");
+  });
+
+  it("gives up when the refreshed token is rejected too", async () => {
+    vi.spyOn(browserNavigation, "assign").mockImplementation(() => {});
+    fakeAuth.refreshSession.mockResolvedValueOnce({ data: { session: { access_token: "fresh" } }, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, {})));
+    await expect(authRequest("/api/orders", { redirect: false })).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("sends accounts without a profile to finish signing up", async () => {
+    const assign = vi.spyOn(browserNavigation, "assign").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(403, { error: "Finish setting up", code: "profile_required" })));
+
+    await expect(authRequest("/api/orders")).rejects.toMatchObject({ code: "profile_required" });
+    expect(assign).toHaveBeenCalledWith("/complete-profile?next=%2F");
+
+    assign.mockClear();
+    await expect(authRequest("/api/orders", { redirect: false })).rejects.toMatchObject({ code: "profile_required" });
+    expect(assign).not.toHaveBeenCalled();
   });
 });

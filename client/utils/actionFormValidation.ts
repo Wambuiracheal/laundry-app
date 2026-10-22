@@ -9,12 +9,6 @@ export type ForgotPasswordValues = {
   email: string;
 };
 
-export type RescheduleValues = {
-  pickupDate: string;
-  timeWindow: string;
-  note: string;
-};
-
 export type CancellationValues = {
   reason: string;
   details: string;
@@ -58,32 +52,6 @@ export function validateForgotPassword(values: ForgotPasswordValues): FormErrors
 
   if (!emailRegex.test(values.email.trim())) {
     errors.email = "Enter a valid email address.";
-  }
-
-  return errors;
-}
-
-export function validateRescheduleForm(values: RescheduleValues): FormErrors<RescheduleValues> {
-  const errors: FormErrors<RescheduleValues> = {};
-
-  if (isBlank(values.pickupDate)) {
-    errors.pickupDate = "Select a pickup date.";
-  } else {
-    const selectedDate = new Date(values.pickupDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
-      errors.pickupDate = "Choose today or a future date.";
-    }
-  }
-
-  if (isBlank(values.timeWindow)) {
-    errors.timeWindow = "Choose a time window.";
-  }
-
-  if (!isBlank(values.note) && values.note.trim().length < 6) {
-    errors.note = "Add a few more details or leave blank.";
   }
 
   return errors;

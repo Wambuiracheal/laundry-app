@@ -4,12 +4,14 @@
  *
  *   npm run create-user -- --email admin@example.com --password 'Str0ng!Pass' [--role admin] [--name "First Last"] [--phone +254700000000]
  *
- * If the email already exists, that user's role and password are updated instead.
+ * The login lives in Supabase Auth (created already confirmed, so no email is sent); the role
+ * lives in the app's database. If the email already exists, its role and password are updated.
+ * Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
  */
 require('dotenv').config();
-const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 const { validateEmailAndPhone, validatePasswordStrength } = require('../src/middlewares/validator');
+const { findAuthUserByEmail, getAdminClient } = require('../src/utils/supabaseAuth');
 
 const { ROLES: ALL_ROLES } = require('../src/utils/roles');
 
@@ -28,13 +30,28 @@ function parseArgs(argv) {
   return args;
 }
 
+/** Creates the Supabase login, or resets the password of an existing one. Returns its id. */
+async function upsertAuthUser({ email, password, fullName }) {
+  const admin = getAdminClient().auth.admin;
+  const existing = await findAuthUserByEmail(email);
+  if (existing) {
+    const { error } = await admin.updateUserById(existing.id, { password, email_confirm: true });
+    if (error) throw error;
+    return existing.id;
+  }
+  const { data, error } = await admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName } });
+  if (error) throw error;
+  return data.user.id;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const email = (args.email ?? '').trim().toLowerCase();
   const password = args.password ?? '';
   const role = args.role ?? 'admin';
   const phone = (args.phone ?? '').trim();
-  const [firstName, ...rest] = (args.name ?? 'Panda Admin').trim().split(/\s+/);
+  const fullName = (args.name ?? 'Panda Admin').trim().replace(/\s+/g, ' ');
+  const [firstName, ...rest] = fullName.split(' ');
 
   if (!email || !password) {
     throw new Error('Usage: npm run create-user -- --email <email> --password <password> [--role admin|staff|rider] [--name "First Last"] [--phone <phone>]');
@@ -47,17 +64,16 @@ async function main() {
 
   const prisma = new PrismaClient();
   try {
-    const password_hash = await bcrypt.hash(password, 10);
+    const authId = await upsertAuthUser({ email, password, fullName });
     const existing = await prisma.user.findUnique({ where: { email } });
 
     if (existing) {
-      await prisma.user.update({ where: { id: existing.id }, data: { role, password_hash } });
-      // Sign out existing sessions so the old password and role stop working.
-      await prisma.refreshToken.updateMany({ where: { user_id: existing.id }, data: { revoked: true } });
+      // The API re-reads roles at most a minute after they change.
+      await prisma.user.update({ where: { id: existing.id }, data: { role, auth_id: authId } });
       console.log(`Updated ${email}: role set to ${role}, password reset.`);
     } else {
       await prisma.user.create({
-        data: { first_name: firstName, last_name: rest.join(' '), email, phone, password_hash, role },
+        data: { auth_id: authId, first_name: firstName, last_name: rest.join(' '), email, phone, role },
       });
       console.log(`Created ${role} account for ${email}.`);
     }

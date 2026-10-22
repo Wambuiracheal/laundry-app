@@ -1,6 +1,22 @@
-import { parseSession, readSessionSnapshot, saveSession } from "@/utils/session";
+import { clearSession } from "@/utils/session";
+import { currentAccessToken, getSupabase } from "@/utils/supabaseClient";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
+
+/** An API error, with the HTTP status and the API's error `code` (e.g. "profile_required") when given. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export const SESSION_EXPIRED_MESSAGE = "Your session has expired. Please log in again.";
 
 async function readResponse<TResponse>(response: Response): Promise<TResponse> {
   const data = await response.json().catch(() => null);
@@ -9,7 +25,7 @@ async function readResponse<TResponse>(response: Response): Promise<TResponse> {
     const message =
       (data && typeof data.error === "string" && data.error) ||
       `Request failed with status ${response.status}`;
-    throw new Error(message);
+    throw new ApiError(message, response.status, data && typeof data.code === "string" ? data.code : undefined, data);
   }
 
   return data as TResponse;
@@ -27,52 +43,64 @@ export async function postJson<TResponse>(path: string, payload: unknown): Promi
   return readResponse<TResponse>(response);
 }
 
-/** Exchanges the stored refresh token for a new pair. Returns the new access token, or null. */
-async function refreshAccessToken(): Promise<string | null> {
-  const session = parseSession(readSessionSnapshot());
-  if (!session?.refreshToken) return null;
+/** Full-page navigation, kept on an object so tests can watch it. */
+export const browserNavigation = {
+  assign(url: string) {
+    window.location.assign(url);
+  },
+};
 
-  try {
-    const tokens = await postJson<{ accessToken: string; refreshToken: string }>("/api/auth/refresh", {
-      refreshToken: session.refreshToken,
-    });
-    saveSession({ ...session, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-    return tokens.accessToken;
-  } catch {
-    return null;
-  }
+/** Sends the visitor to `path`, remembering the current page so they come back after. */
+function leaveTo(path: string) {
+  if (typeof window === "undefined") return;
+  const here = `${window.location.pathname}${window.location.search}`;
+  browserNavigation.assign(`${path}?next=${encodeURIComponent(here)}`);
 }
 
 /**
- * Sends a request with the signed-in user's access token. On a 401 it refreshes the token
- * once and retries, since access tokens are short-lived (and reset when the API restarts).
- * A FormData body is sent as multipart (for file uploads); anything else is sent as JSON.
+ * Sends a request with the signed-in user's Supabase access token. On a 401 it refreshes the
+ * token once and retries. Signed-out visitors are sent to login, and accounts that haven't
+ * finished sign-up to the profile form. A FormData body is sent as multipart (for file
+ * uploads); anything else is sent as JSON.
  */
 export async function authRequest<TResponse>(
   path: string,
-  { method = "GET", body }: { method?: string; body?: unknown } = {},
+  { method = "GET", body, redirect = true }: { method?: string; body?: unknown; redirect?: boolean } = {},
 ): Promise<TResponse> {
   const isForm = body instanceof FormData;
-  const send = (accessToken?: string) =>
+  const send = (accessToken: string) =>
     fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: {
         // The browser sets the multipart Content-Type (with its boundary) for FormData itself.
         ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }),
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        Authorization: `Bearer ${accessToken}`,
       },
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
 
-  let response = await send(parseSession(readSessionSnapshot())?.accessToken);
+  const signedOut = () => {
+    clearSession();
+    if (redirect) leaveTo("/login");
+    return new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+  };
 
+  const token = await currentAccessToken();
+  if (!token) throw signedOut();
+
+  let response = await send(token);
   if (response.status === 401) {
-    const accessToken = await refreshAccessToken();
-    if (!accessToken) {
-      throw new Error("Your session has expired. Please log in again.");
-    }
-    response = await send(accessToken);
+    const { data } = await getSupabase().auth.refreshSession();
+    const refreshed = data.session?.access_token;
+    if (!refreshed) throw signedOut();
+    response = await send(refreshed);
+    if (response.status === 401) throw signedOut();
   }
 
-  return readResponse<TResponse>(response);
+  try {
+    return await readResponse<TResponse>(response);
+  } catch (error) {
+    if (redirect && error instanceof ApiError && error.code === "profile_required") leaveTo("/complete-profile");
+    throw error;
+  }
 }

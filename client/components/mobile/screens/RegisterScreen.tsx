@@ -12,7 +12,8 @@ import {
     iconInputWrapperClass,
     submitButtonClass,
 } from "@/components/shared/form/FormField";
-import { getGoogleSignupUrl, signup } from "@/utils/authApi";
+import { SocialSignInButtons } from "@/components/shared/SocialSignInButtons";
+import { signUpWithEmail } from "@/utils/authApi";
 import {
     hasRegisterErrors,
     type RegisterErrors,
@@ -20,7 +21,7 @@ import {
     validateRegister,
 } from "@/utils/registerValidation";
 import { type SignupRole } from "@/utils/roles";
-import { currentNextParam, postLoginPath, saveSession, withCurrentNext } from "@/utils/session";
+import { currentNextParam, postLoginPath, withCurrentNext } from "@/utils/session";
 
 const initialValues: RegisterValues = {
     fullName: "",
@@ -43,14 +44,12 @@ const copy: Record<SignupRole, { title: string; subtitle: string; submit: string
     },
 };
 
-function handleGoogleSignup() {
-    window.location.assign(getGoogleSignupUrl());
-}
-
 export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
     const [values, setValues] = useState<RegisterValues>(initialValues);
     const [errors, setErrors] = useState<RegisterErrors>({});
     const [status, setStatus] = useState<string | null>(null);
+    // Set once sign-up worked but Supabase wants the email confirmed first.
+    const [confirmEmailFor, setConfirmEmailFor] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -77,26 +76,42 @@ export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
             setIsSubmitting(true);
             setStatus(null);
 
-            const result = await signup(values, role);
+            const next = currentNextParam();
+            const result = await signUpWithEmail(values, role, next);
 
-            saveSession({
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken,
-                email: result.user?.email ?? values.email.trim(),
-                fullName: result.user?.fullName ?? values.fullName.trim(),
-                role: result.user?.role,
-            });
-            setStatus("Account created. Redirecting...");
+            if (result.status === "confirm_email") {
+                setConfirmEmailFor(values.email.trim());
+                return;
+            }
+            if (result.status === "needs_profile") {
+                router.replace(`/complete-profile?${new URLSearchParams({ ...(next ? { next } : {}), role })}`);
+                return;
+            }
             // Back to the page that sent them here (e.g. booking a pickup), if their role may open it.
-            router.replace(postLoginPath(currentNextParam(), result.user?.role ?? role));
-            setValues(initialValues);
-            setErrors({});
+            router.replace(postLoginPath(next, result.profile.role));
         } catch (error) {
             const message = error instanceof Error ? error.message : "Signup failed.";
             setStatus(message);
         } finally {
             setIsSubmitting(false);
         }
+    }
+
+    if (confirmEmailFor) {
+        return (
+            <AuthLayout title="Check your inbox" subtitle="One more step to finish creating your account.">
+                <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 text-sm text-slate-600">
+                    <p>
+                        We sent a confirmation link to <span className="font-semibold text-slate-900">{confirmEmailFor}</span>. Open it on
+                        this device and you&apos;ll be signed in.
+                    </p>
+                    <p className="text-xs text-slate-500">Can&apos;t find it? Check your spam folder, or sign up again in a few minutes.</p>
+                    <button type="button" className="text-sm font-medium text-blue-700 hover:text-blue-800" onClick={() => setConfirmEmailFor(null)}>
+                        Use a different email
+                    </button>
+                </div>
+            </AuthLayout>
+        );
     }
 
     return (
@@ -192,26 +207,23 @@ export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
                     </FormField>
                 </div>
                 {!errors.password && !errors.confirmPassword ? (
-                    <p className="-mt-2 text-xs text-slate-400">Use at least 8 characters. Mixing letters and numbers makes it stronger.</p>
+                    <p className="-mt-2 text-xs text-slate-400">Use at least 8 characters with upper and lower case letters, a number and a symbol.</p>
                 ) : null}
 
                 <button className={submitButtonClass} type="submit" disabled={isSubmitting}>
                     {isSubmitting ? "Creating account..." : copy[role].submit}
                 </button>
 
-                {/* Google signup creates a customer account, so riders register with email only. */}
-                {role === "customer" ? (
-                    <button
-                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-                        type="button"
-                        onClick={handleGoogleSignup}
-                        disabled={isSubmitting}
-                    >
-                        Continue with Google
-                    </button>
-                ) : null}
+                {status ? <FormStatusMessage message={status} tone="error" /> : null}
 
-                {status ? <FormStatusMessage message={status} /> : null}
+                <div className="flex items-center gap-3 py-1 text-slate-400">
+                    <hr className="flex-1 border-slate-200" />
+                    <span className="text-[11px] font-medium uppercase tracking-wider">or sign up with</span>
+                    <hr className="flex-1 border-slate-200" />
+                </div>
+
+                {/* Social sign-ups ask for a phone number next, since the provider doesn't share one. */}
+                <SocialSignInButtons role={role} disabled={isSubmitting} onError={setStatus} />
 
                 <p className="pt-2 text-center text-sm text-slate-500">
                     Already have an account?{" "}

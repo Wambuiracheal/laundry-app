@@ -28,10 +28,14 @@ services:
       # The Netlify site URL, e.g. https://panda-laundry.netlify.app (comma-separate several)
       - key: CLIENT_URL
         sync: false
-      - key: TOKEN_SIGNING_SEED
-        generateValue: true
-      - key: SESSION_SECRET
-        generateValue: true
+      # Supabase Auth (Project settings > API). The service key must stay server-side.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Only for projects still on the legacy JWT secret
+      - key: SUPABASE_JWT_SECRET
+        sync: false
       # M-Pesa (Daraja). Keep sandbox until you have production credentials.
       - key: MPESA_ENV
         value: sandbox

@@ -9,7 +9,8 @@
   NODE_VERSION = "22"
   # Set NEXT_PUBLIC_API_BASE_URL in Site configuration > Environment variables to the Render
   # API URL (e.g. https://panda-laundry-api.onrender.com). It is baked in at build time, so
-  # trigger a new deploy after changing it.
+  # trigger a new deploy after changing it. Also set NEXT_PUBLIC_SUPABASE_URL and
+  # NEXT_PUBLIC_SUPABASE_ANON_KEY (Supabase > Project settings > API) for sign-in.
 
 # Netlify's Next.js runtime turns the `.next` build into pages and functions (server rendering
 # and the proxy that protects signed-in pages). Declared explicitly because auto-detection didn't

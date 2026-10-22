@@ -1,6 +1,4 @@
 const { createClient } = require('redis');
-// FIX 1: Use named destructuring required by connect-redis v8/v9
-const { RedisStore } = require('connect-redis');
 
 let redisClient = null;
 let subscriberClient = null;
@@ -79,18 +77,6 @@ async function getRedisClient() {
   return redisClient;
 }
 
-/** Redis-backed session store, or null when Redis isn't available. */
-function createSessionStore() {
-  if (!redisClient || !redisReady) {
-    return null;
-  }
-
-  return new RedisStore({
-    client: redisClient,
-    prefix: 'laundry:sess:',
-  });
-}
-
 async function cacheValue(key, value, ttlSeconds = 300) {
   try {
     const client = await getRedisClient();
@@ -158,7 +144,6 @@ async function publishEvent(channel, payload) {
 module.exports = {
   initRedis,
   getRedisClient,
-  createSessionStore,
   cacheValue,
   getCachedValue,
   deleteCacheValue,

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/mobile/primitives";
 import { NOTIFICATIONS_READ_EVENT } from "@/utils/notificationsApi";
 import { saveSession } from "@/utils/session";
+import { fakeAuth } from "../supabaseMock";
 
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace }) }));
@@ -11,16 +12,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace }
 function stubFeed(unread: number) {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockImplementation(async (url: string) =>
-      url.endsWith("/api/auth/logout")
-        ? new Response("{}", { status: 200 })
-        : new Response(JSON.stringify({ notifications: [], unread }), { status: 200 }),
-    ),
+    vi.fn().mockImplementation(async () => new Response(JSON.stringify({ notifications: [], unread }), { status: 200 })),
   );
 }
 
 beforeEach(() => {
-  saveSession({ email: "jane@example.com", fullName: "Jane Wanjiru", role: "customer", accessToken: "t", refreshToken: "r" });
+  saveSession({ email: "jane@example.com", fullName: "Jane Wanjiru", role: "customer" });
 });
 
 describe("customer sidebar", () => {
@@ -120,6 +117,7 @@ describe("customer sidebar", () => {
 
     await user.click(screen.getByRole("button", { name: "Log out" }));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(fakeAuth.signOut).toHaveBeenCalled();
     expect(localStorage.getItem("pl_session")).toBeNull();
   });
 });

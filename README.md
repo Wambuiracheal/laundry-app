@@ -31,7 +31,7 @@ The app is a classic three-tier setup: a browser client, a stateless REST API, a
 flowchart LR
     subgraph Browser
         UI["Next.js client<br/>(React 19, Tailwind 4)"]
-        LS[("localStorage<br/>access + refresh tokens")]
+        LS[("localStorage<br/>Supabase session")]
         CK[("pl_session cookie<br/>presence flag")]
     end
 
@@ -41,10 +41,10 @@ flowchart LR
     end
 
     subgraph "Express API :5000"
-        MW["Middleware<br/>cors · json · express-session · validators"]
+        MW["Middleware<br/>cors · json · auth · validators"]
         RT["Routers<br/>/api/auth · /api/orders · /api/services · ..."]
         PR["Prisma Client"]
-        RU["Redis utils<br/>cache · session store · pub/sub"]
+        RU["Redis utils<br/>cache · pub/sub"]
     end
 
     DB[("PostgreSQL 16<br/>laundry_db")]
@@ -56,7 +56,6 @@ flowchart LR
     UI -.stores.-> LS
     RT --> PR --> DB
     RT --> RU --> RD
-    MW -.session store.-> RD
 ```
 
 ### Key design decisions
@@ -65,11 +64,10 @@ flowchart LR
 | --- | --- |
 | **Client rendering** | Next.js App Router. Thin `app/*/page.tsx` route files render screen components from `components/`. |
 | **Route protection (client)** | `client/proxy.ts` (Next.js 16's replacement for `middleware.ts`) checks for a `pl_session` presence cookie and redirects signed-out users to `/login?next=...`. It's an optimistic check only. The API is the source of truth. |
-| **Auth tokens** | Short-lived **PASETO v2** access tokens (1h, Ed25519-signed via `tweetnacl`) plus opaque **refresh tokens** (7 days) stored as SHA-256 hashes in PostgreSQL and **rotated** on every refresh. |
-| **Passwords** | Hashed with `bcrypt`. |
+| **Sign-in** | **Supabase Auth**: email/password with email confirmation, Google, Facebook and Apple, and password resets, called from the browser with `@supabase/supabase-js`. Supabase stores the passwords and refreshes the tokens. |
+| **API auth** | The API verifies the Supabase access token (JWT) with `jose`, then loads the user from its own `User` table by `auth_id`. Roles live only in that table, so a user can't grant themselves one; a new account first completes its profile (name, phone, customer or rider). |
 | **Data access** | Prisma ORM over PostgreSQL, with versioned SQL migrations in `server/prisma/migrations`. |
 | **Caching** | Redis read-through cache (e.g. `GET /api/services` cached for 60s under `services:all`). Cache helpers fail soft, so the API keeps working if Redis is down. |
-| **Sessions** | `express-session` with a `connect-redis` store (prefix `laundry:sess:`). |
 | **Events** | Redis pub/sub on the `laundry-events` channel. The server subscribes at startup and logs incoming events. |
 | **Validation** | Hand-written Express middlewares on the server (`src/middlewares/validator.js`) and matching client-side validators in `client/utils/*Validation.ts`. |
 | **Deployment** | Multi-stage Docker images for both apps, orchestrated with Docker Compose. The server runs `prisma migrate deploy` on boot, and the client is built as a Next.js `standalone` bundle. |
@@ -77,11 +75,10 @@ flowchart LR
 ### Request lifecycle (example: login)
 
 1. The user submits the login form. `client/utils/loginValidation.ts` validates it in the browser.
-2. `authApi.login()` calls `POST {NEXT_PUBLIC_API_BASE_URL}/api/auth/login` through `utils/apiClient.ts`.
-3. Express runs `validateLoginRequest`, looks up the user with Prisma, and checks the password with bcrypt.
-4. The API returns `{ accessToken, refreshToken }`.
-5. The client's `saveSession()` stores the tokens in `localStorage` and sets the `pl_session` cookie.
-6. `proxy.ts` now lets the user into protected pages, and `useSession()` (built on `useSyncExternalStore`) re-renders any component that depends on the session.
+2. `authApi.signInWithEmail()` signs in with Supabase Auth, which keeps the session in `localStorage`.
+3. It then calls `GET /api/auth/me` with the Supabase access token. Express verifies the token and loads the user's profile and role.
+4. The client's `saveSession()` caches the profile and sets the `pl_session` role cookie.
+5. `proxy.ts` now lets the user into protected pages, and `useSession()` (built on `useSyncExternalStore`) re-renders any component that depends on the session. `utils/apiClient.ts` attaches the current Supabase token to every API call.
 
 ---
 
@@ -106,10 +103,9 @@ flowchart LR
 | [Express](https://expressjs.com) | 5 | HTTP framework |
 | [Prisma](https://www.prisma.io) | 5.22 | ORM, migrations |
 | [PostgreSQL](https://www.postgresql.org) | 16 | Primary database (Supabase in production) |
-| [Redis](https://redis.io) (`redis` client) | 7 / 6.x | Optional: cache, session store, pub/sub |
-| `express-session` + `connect-redis` | — | Server sessions in Redis |
-| `paseto` + `tweetnacl` | — | Signed access tokens (PASETO v2.public) |
-| `bcrypt` | 6 | Password hashing |
+| [Redis](https://redis.io) (`redis` client) | 7 / 6.x | Optional: cache, pub/sub |
+| `@supabase/supabase-js` | 2 | Supabase Auth admin API (creating and linking accounts) |
+| `jose` | 5 | Verifying Supabase access tokens (JWT) |
 | `cors`, `dotenv` | — | CORS handling, env loading |
 | `nodemon` | 3 | Dev auto-reload |
 
@@ -138,9 +134,10 @@ laundry-app/
 │   │   ├── layout.tsx            # Root layout, fonts, metadata
 │   │   ├── globals.css           # Tailwind entry + global styles
 │   │   ├── page.tsx              # "/" landing page
-│   │   ├── login/  register/  forgot-password/
+│   │   ├── login/  register/  forgot-password/  reset-password/
+│   │   ├── auth/callback/  complete-profile/
 │   │   ├── customer-dashboard/  dark-dashboard/
-│   │   ├── new-order/  order-tracking/  profile/
+│   │   ├── new-order/  order-tracking/  notifications/  profile/
 │   │   ├── reschedule/  cancel-pickup/  cancel-order/  support/
 │   │   └── preview/              # Dev hub linking to every screen
 │   ├── components/
@@ -172,15 +169,15 @@ laundry-app/
     ├── src/
     │   ├── app.js                # Express app: middleware + route mounting
     │   ├── middlewares/
-    │   │   └── validator.js      # Signup/login/token request validation
+    │   │   ├── auth.js           # Supabase token check, role guard
+    │   │   └── validator.js      # Profile and phone validation
     │   ├── routes/               # One router per resource
-    │   │   ├── auth.js           # signup, login, refresh, logout, verify
-    │   │   ├── orders.js  order-items.js  order-status-history.js
-    │   │   ├── payments.js  transactions.js
-    │   │   ├── services.js  reviews.js  users.js
-    │   │   └── actions.js        # support, forgot-password, reschedule, cancellations
+    │   │   ├── auth.js           # profile for a Supabase account (me, complete sign-up)
+    │   │   ├── orders.js  mpesa.js  riders.js  tracking.js
+    │   │   ├── services.js  settings.js  notifications.js
+    │   │   └── actions.js        # support tickets
     │   └── utils/
-    │       └── redis.js          # Redis client, cache helpers, session store, pub/sub
+    │       └── redis.js          # Redis client, cache helpers, pub/sub
     ├── Dockerfile
     └── package.json
 ```
@@ -266,8 +263,9 @@ Open http://localhost:3000/preview for a hub that links to every screen.
 | `DIRECT_URL` | same as `DATABASE_URL` locally | Connection used by `prisma migrate` (Supabase session pooler in production) |
 | `BE_PORT` / `PORT` | `5000` | API port (`PORT` wins; hosts like Render set it) |
 | `CLIENT_URL` | `https://your-site.netlify.app` | Origins allowed by CORS, comma-separated; unset allows any |
-| `TOKEN_SIGNING_SEED` | 32+ random characters | Keeps access tokens valid across restarts |
-| `SESSION_SECRET` | `a-long-random-string` | Secret for `express-session` |
+| `SUPABASE_URL` | `https://abcd1234.supabase.co` | Supabase project, for checking sign-in tokens |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Server-only admin key (create-user, migrate-auth, linking accounts) |
+| `SUPABASE_JWT_SECRET` | — | Only for projects on the legacy JWT secret |
 | `REDIS_URL` | `redis://localhost:6379` | Optional Redis connection URL (takes precedence); unset runs without Redis |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Alternative to `REDIS_URL` |
 
@@ -276,8 +274,8 @@ Open http://localhost:3000/preview for a hub that links to every screen.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:5000` | Base URL of the Express API |
-| `NEXT_PUBLIC_GOOGLE_LOGIN_PATH` | `/api/auth/login/google` | Google login path (not implemented on the server yet) |
-| `NEXT_PUBLIC_GOOGLE_SIGNUP_PATH` | `/api/auth/signup/google` | Google signup path (not implemented on the server yet) |
+| `NEXT_PUBLIC_SUPABASE_URL` | — | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | — | Supabase anon / publishable key (browser-safe) |
 
 ---
 
@@ -290,7 +288,6 @@ erDiagram
     User ||--o{ Order : places
     User ||--o{ Order : "is rider for"
     User ||--o{ Review : writes
-    User ||--o{ RefreshToken : owns
     Order ||--o{ OrderItem : contains
     Service ||--o{ OrderItem : "priced as"
     Order ||--o{ Payment : "paid by"
@@ -301,8 +298,7 @@ erDiagram
 
 | Model | Purpose |
 | --- | --- |
-| `User` | Customers, admins, riders and staff (`role`) |
-| `RefreshToken` | Hashed refresh tokens with expiry and revocation |
+| `User` | Customers, admins, riders and staff (`role`), linked to Supabase Auth by `auth_id` |
 | `Service` | Catalogue items (`price_type`: `per_kg` / `per_item` / `fixed`) |
 | `Order` | Pickup/delivery details, amounts, `payment_status`, assigned rider |
 | `OrderItem` | Service line items on an order |
@@ -310,7 +306,8 @@ erDiagram
 | `Transaction` | Ledger entry (M-Pesa ref, credit/debit) linked to a payment |
 | `OrderStatusHistory` | Audit trail of status changes |
 | `Review` | Rating and comment per order |
-| `SupportTicket`, `PasswordResetRequest`, `PickupRescheduleRequest`, `CancellationRequest` | Records created by the `/api/actions/*` forms |
+| `SupportTicket`, `CancellationRequest` | Support tickets, and the reasons customers give when cancelling |
+| `PasswordResetRequest`, `PickupRescheduleRequest` | No longer written (resets moved to Supabase, reschedules act on the order); kept so existing rows aren't lost |
 
 ### Common Prisma commands
 
@@ -332,44 +329,37 @@ Base URL: `http://localhost:5000`. All bodies are JSON.
 
 | Method | Path | Body | Description |
 | --- | --- | --- | --- |
-| POST | `/signup` | `fullName, email, phone, password, confirmPassword?, role?` | Create an account |
-| POST | `/login` | `email, password` | Returns `{ accessToken, refreshToken }` |
-| POST | `/refresh` | `refreshToken` | Rotates the refresh token and issues a new access token |
-| POST | `/logout` | `refreshToken` | Revokes the refresh token |
-| POST | `/verify` | `token` | Verifies a PASETO access token |
-| POST | `/token` | `userId, role?` | Issues a token manually (testing only) |
+Sign-up, login, social logins, logout and password resets go to Supabase Auth directly from the browser. Every API request sends the Supabase access token as `Authorization: Bearer <token>`.
 
-Signup rules: email and E.164 phone format, a password of at least 8 characters with upper, lower, digit and symbol, and a full name with at least two words.
+| Method | Path | Body | Description |
+| --- | --- | --- | --- |
+| GET | `/me` | — | The signed-in user's profile, or 404 `profile_required` with details to prefill the profile form |
+| POST | `/profile` | `fullName, phone, role?` | Completes a new account (`role`: `customer` or `rider`) |
+
+Profile rules: a full name with at least two words and a valid mobile number (Kenyan numbers are stored as `+2547…`). Accounts made before Supabase, or by an admin, are linked by email once Supabase confirms the address. Admin and staff accounts come from `npm run create-user`.
 
 ### Resources
 
+All endpoints except the M-Pesa callback and support need a signed-in user; the role each one needs is checked on the server.
+
 | Resource | Base path | Endpoints |
 | --- | --- | --- |
-| Services | `/api/services` | `GET /` (Redis-cached for 60s) |
-| Orders | `/api/orders` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Order items | `/api/order-items` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Order status history | `/api/order-status-history` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Payments | `/api/payments` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Transactions | `/api/transactions` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Reviews | `/api/reviews` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
-| Users | `/api/users` | `GET /`, `GET /:id`, `PUT /:id`, `DELETE /:id` |
-
-### Customer actions: `/api/actions`
-
-| Method | Path | Description |
-| --- | --- | --- |
-| POST | `/support` | Submit a support ticket |
-| POST | `/forgot-password` | Request a password reset |
-| POST | `/reschedule` | Reschedule a pickup |
-| POST | `/cancel-pickup` | Cancel a pickup |
-| POST | `/cancel-order` | Cancel an order |
+| Services | `/api/services` | `GET /` (Redis-cached for 60s), `PATCH /:id` (admin pricing) |
+| Orders (customer) | `/api/orders` | `GET /delivery-quote`, `POST /request`, `GET /mine`, `PATCH /:id/reschedule`, `PATCH /:id/cancel` |
+| Orders (shop) | `/api/orders` | `GET /queue`, `GET /riders`, `PATCH /:id/assign`, `PATCH /:id/measure`, `PATCH /:id/status`, `POST /:id/damages`, `DELETE /:id/damages/:damageId` |
+| Orders (rider) | `/api/orders` | `GET /rider/jobs`, `POST /:id/claim`, `PATCH /:id/rider-status` |
+| M-Pesa | `/api/payments/mpesa` | `POST /stk`, `GET /:paymentId`, `GET /` (admin), `POST /callback/:secret` (Daraja) |
+| Riders | `/api/riders` | `GET /me/earnings`, `GET /payouts`, `POST /:riderId/payout` |
+| Settings | `/api/settings` | `GET /`, `PATCH /` (admin) |
+| Tracking | `/api/tracking` | `PUT /me/location`, `DELETE /me/location`, `GET /jobs/:orderId/route`, `GET /orders/:orderId`, `GET /live` |
+| Notifications | `/api/notifications` | `GET /mine`, `POST /read`, `GET /preferences`, `PATCH /preferences` |
+| Support | `/api/actions` | `POST /support` |
 
 ### Misc
 
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/` | Health check (`Laundry API is running!`) |
-| POST | `/api/redis/publish` | Publish `{ channel?, message }` to Redis pub/sub |
 
 ---
 
@@ -379,22 +369,21 @@ Signup rules: email and E.164 phone format, a password of at least 8 characters 
 sequenceDiagram
     participant B as Browser
     participant P as proxy.ts
+    participant S as Supabase Auth
     participant A as Express API
     participant D as PostgreSQL
 
-    B->>A: POST /api/auth/login
-    A->>D: find user and check bcrypt hash
-    A->>D: store SHA-256(refreshToken)
-    A-->>B: accessToken (PASETO, 1h) + refreshToken (7d)
-    B->>B: localStorage + pl_session cookie
+    B->>S: sign in (password, Google, Facebook or Apple)
+    S-->>B: Supabase session (JWT access + refresh token)
+    B->>A: GET /api/auth/me (Bearer JWT)
+    A->>A: verify JWT signature, issuer, audience
+    A->>D: find User by auth_id
+    A-->>B: profile + role (or 404 profile_required)
+    B->>B: cache profile + pl_session role cookie
     B->>P: GET /customer-dashboard
-    P-->>B: allowed (cookie present)
-    Note over B,A: When the access token expires
-    B->>A: POST /api/auth/refresh
-    A->>D: revoke old token, store new one
-    A-->>B: new accessToken + refreshToken
-    B->>A: POST /api/auth/logout
-    A->>D: revoke refresh token
+    P-->>B: allowed (role cookie)
+    Note over B,S: supabase-js refreshes the token before it expires
+    B->>S: sign out (revokes the refresh token)
 ```
 
 ---
@@ -406,14 +395,17 @@ sequenceDiagram
 | `/` | Public | Landing page with booking modal |
 | `/preview` | Public | Hub linking to every screen |
 | `/login`, `/register` | Signed-out only | Auth screens (signed-in users go to the dashboard) |
-| `/forgot-password` | Public | Password reset request |
+| `/forgot-password`, `/reset-password` | Public | Request a reset email; choose a new password from its link |
+| `/auth/callback` | Public | Finishes social logins and email confirmation links |
+| `/complete-profile` | Signed in | Name and phone for new accounts (mostly social logins) |
 | `/customer-dashboard` | Protected | Customer home |
 | `/dark-dashboard` | Protected | Dark-theme dashboard variant |
 | `/new-order` | Protected | Service selection and booking |
 | `/order-tracking` | Protected | Order progress |
+| `/notifications` | Protected | Order updates (also sent by SMS) |
 | `/profile` | Protected | User profile |
 | `/support` | Protected | Contact support |
-| `/reschedule`, `/cancel-pickup`, `/cancel-order` | Protected | Order management forms |
+| `/reschedule`, `/cancel-pickup`, `/cancel-order` | Protected | Reschedule or cancel a pickup before it's collected |
 
 ---
 
@@ -435,13 +427,8 @@ sequenceDiagram
 
 These are current limitations worth knowing before building on the code:
 
-- **API authorization:** Resource routes (`/api/orders`, `/api/users`, etc.) don't verify the access token yet. An auth middleware using `V2.verify` still needs to be added.
-- **Signing keys:** PASETO keys are generated in memory on each server start, so every access token becomes invalid after a restart. Load a fixed key from the environment for production.
-- **Seed script:** `seed.js` writes `pricePerKg`, but the schema uses `price_type` / `base_price`. Update the seed data before running it.
 - **Mock data:** Several dashboard and order screens read from `client/components/mobile/data.ts` rather than the API.
-- **Google OAuth:** The client links to `/api/auth/*/google`, but those routes don't exist on the server yet.
-- **Session cookie:** `cookie.secure` is `false`. Enable it behind HTTPS.
-- **Tests:** No automated tests or CI yet.
+- **CI:** Tests run locally (`npm test` in `client/` and `server/`) but there's no CI pipeline yet.
 - **Docker secrets:** `docker-compose.yml` has development credentials hard-coded. Don't reuse them in production.
 
 ---

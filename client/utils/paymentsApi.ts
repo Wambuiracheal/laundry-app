@@ -52,10 +52,3 @@ export function paymentFailureMessage(payment: Pick<MpesaPayment, "result_code" 
       return payment.result_desc || "The payment didn't go through.";
   }
 }
-
-/** 254712345678 -> 0712 *** 678, for showing which phone was prompted. */
-export function maskPhone(phone: string | null) {
-  if (!phone) return "—";
-  const local = `0${phone.slice(3)}`;
-  return `${local.slice(0, 4)} *** ${local.slice(-3)}`;
-}

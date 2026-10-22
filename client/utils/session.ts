@@ -1,10 +1,10 @@
-import { postJson } from "@/utils/apiClient";
 import { canAccess, homeForRole, isRole } from "@/utils/roles";
+import { getSupabase } from "@/utils/supabaseClient";
 
 /**
  * Cookie read by `proxy.ts` to route the visitor: its value is the signed-in user's role, used
- * to keep each role on its own pages. It holds no credentials; the tokens live in localStorage
- * and the API remains the source of truth for authorization.
+ * to keep each role on its own pages. It holds no credentials; Supabase keeps the tokens and the
+ * API remains the source of truth for authorization.
  */
 export const SESSION_COOKIE = "pl_session";
 
@@ -12,9 +12,8 @@ const STORAGE_KEY = "pl_session";
 const CHANGE_EVENT = "pl-session-change";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+/** The signed-in user's profile, cached for the UI (names, avatar, which pages to show). */
 export type Session = {
-  accessToken?: string;
-  refreshToken?: string;
   email: string;
   fullName?: string;
   // customer | rider | staff | admin
@@ -68,11 +67,12 @@ export function subscribeToSession(onChange: () => void) {
   };
 }
 
-/** Revokes the refresh token server-side (best effort), then clears the local session. */
+/** Signs out of Supabase (revoking the refresh token, best effort), then clears the local profile. */
 export async function logout() {
-  const refreshToken = parseSession(readSessionSnapshot())?.refreshToken;
-  if (refreshToken) {
-    await postJson("/api/auth/logout", { refreshToken }).catch(() => undefined);
+  try {
+    await getSupabase().auth.signOut();
+  } catch {
+    // Offline or not configured: still sign out locally.
   }
   clearSession();
 }

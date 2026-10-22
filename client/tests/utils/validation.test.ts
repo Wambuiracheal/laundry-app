@@ -3,7 +3,6 @@ import {
   hasErrors,
   validateCancellationForm,
   validateForgotPassword,
-  validateRescheduleForm,
   validateSupportForm,
 } from "@/utils/actionFormValidation";
 import { hasBookingErrors, validateBookingForm } from "@/utils/bookingValidation";
@@ -57,9 +56,9 @@ describe("validateRegister", () => {
 
   it("flags each invalid field", () => {
     expect(
-      validateRegister({ fullName: "J", email: "nope", phone: "123", password: "short", confirmPassword: "other" }),
+      validateRegister({ fullName: "Jane", email: "nope", phone: "123", password: "short", confirmPassword: "other" }),
     ).toEqual({
-      fullName: "Please enter your full name.",
+      fullName: "Please enter your first and last name.",
       email: "Please enter a valid email address.",
       phone: "Please enter a valid phone number.",
       password: "Use at least 8 characters with upper and lower case letters, a number and a symbol.",
@@ -156,15 +155,6 @@ describe("action forms", () => {
   it("validates the forgot-password email", () => {
     expect(validateForgotPassword({ email: "jane@example.com" })).toEqual({});
     expect(validateForgotPassword({ email: "jane" }).email).toBe("Enter a valid email address.");
-  });
-
-  it("validates the reschedule form", () => {
-    expect(validateRescheduleForm({ pickupDate: "2026-10-25", timeWindow: "morning", note: "" })).toEqual({});
-    expect(validateRescheduleForm({ pickupDate: "2026-10-01", timeWindow: "", note: "hi" })).toEqual({
-      pickupDate: "Choose today or a future date.",
-      timeWindow: "Choose a time window.",
-      note: "Add a few more details or leave blank.",
-    });
   });
 
   it("validates the cancellation form", () => {

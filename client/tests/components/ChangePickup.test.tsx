@@ -60,7 +60,7 @@ const patchCalls = (fetchMock: ReturnType<typeof stubApi>) => fetchMock.mock.cal
 beforeEach(() => {
   push.mockClear();
   searchParams = new URLSearchParams();
-  saveSession({ email: "jane@example.com", role: "customer", accessToken: "t" });
+  saveSession({ email: "jane@example.com", role: "customer" });
 });
 
 describe("Cancel order", () => {

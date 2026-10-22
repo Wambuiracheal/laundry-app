@@ -18,8 +18,9 @@ function isBlank(value: string): boolean {
 export function validateRegister(values: RegisterValues): RegisterErrors {
   const errors: RegisterErrors = {};
 
-  if (isBlank(values.fullName) || values.fullName.trim().length < 2) {
-    errors.fullName = "Please enter your full name.";
+  // The account needs a first and last name (the API rejects a single name).
+  if (isBlank(values.fullName) || values.fullName.trim().split(/\s+/).length < 2) {
+    errors.fullName = "Please enter your first and last name.";
   }
 
   if (!emailRegex.test(values.email.trim())) {
@@ -30,7 +31,16 @@ export function validateRegister(values: RegisterValues): RegisterErrors {
     errors.phone = "Please enter a valid phone number.";
   }
 
-  // Same rule the API enforces, so customers find out here rather than after submitting.
+  return { ...errors, ...validateNewPassword(values) };
+}
+
+export type NewPasswordValues = Pick<RegisterValues, "password" | "confirmPassword">;
+export type NewPasswordErrors = Partial<Record<keyof NewPasswordValues, string>>;
+
+/** Password rules for sign-up and resets (also set as the password policy in Supabase, see DEPLOY.md). */
+export function validateNewPassword(values: NewPasswordValues): NewPasswordErrors {
+  const errors: NewPasswordErrors = {};
+
   if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(values.password)) {
     errors.password = "Use at least 8 characters with upper and lower case letters, a number and a symbol.";
   }
