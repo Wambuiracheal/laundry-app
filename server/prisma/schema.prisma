@@ -23,6 +23,7 @@ model User {
   phone         String
   password_hash String
   role          String         // customer | admin | rider | staff
+  sms_opt_in    Boolean        @default(true) // customers: text me when my order moves
   orders        Order[]        @relation("UserOrders")
   reviews       Review[]
   created_at    DateTime       @default(now())
@@ -31,6 +32,25 @@ model User {
   earnings      RiderEarning[] @relation("RiderEarnings")
   location      RiderLocation?
   refreshTokens RefreshToken[]
+  notifications Notification[]
+}
+
+// An update about a customer's order: listed in the app and, when the customer has SMS on,
+// texted to their phone.
+model Notification {
+  id         String    @id @default(uuid())
+  user_id    String
+  user       User      @relation(fields: [user_id], references: [id])
+  order_id   String?
+  order      Order?    @relation(fields: [order_id], references: [id])
+  event      String    // order_placed | rescheduled | picked_up | processing | ready | out_for_delivery | delivered | cancelled | payment_received
+  message    String    @db.Text
+  sms_status String    // sent | failed | skipped (SMS off, not configured, or no valid phone)
+  sms_error  String?
+  read_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id, created_at])
 }
 
 model RefreshToken {
@@ -86,6 +106,7 @@ model Order {
   damages           DamageReport[]
   riderEarnings     RiderEarning[]
   reviews           Review[]
+  notifications     Notification[]
   created_at        DateTime    @default(now())
   updated_at        DateTime    @updatedAt
 }

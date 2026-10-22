@@ -40,6 +40,7 @@ export const config = {
     "/dark-dashboard/:path*",
     "/new-order/:path*",
     "/order-tracking/:path*",
+    "/notifications/:path*",
     "/profile/:path*",
     "/support/:path*",
     "/cancel-order/:path*",

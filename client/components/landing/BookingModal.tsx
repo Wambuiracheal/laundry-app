@@ -1,29 +1,39 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { serviceItems } from "@/components/mobile/data";
 import {
   hasBookingErrors,
   validateBookingForm,
   type BookingFormErrors,
   type BookingFormValues,
 } from "@/utils/bookingValidation";
+import { saveBookingDraft } from "@/utils/bookingDraft";
 import { formControlClass, submitButtonClass } from "@/components/shared/form/FormField";
 
 type BookingModalProps = {
   open: boolean;
   onClose: () => void;
-  onBooked: (name: string) => void;
 };
 
 const initialValues: BookingFormValues = {
-  fullName: "",
-  phone: "",
   location: "",
   service: "",
   pickupDate: "",
 };
 
-export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
+/**
+ * Quick start for a pickup from the landing page. The choices are carried to the full booking
+ * form, which asks visitors to sign in (or sign up) first so we can text them updates.
+ */
+export function BookingModal({ open, onClose }: BookingModalProps) {
+  // Mounted only while open, so the form starts empty every time.
+  return open ? <BookingDialog onClose={onClose} /> : null;
+}
+
+function BookingDialog({ onClose }: Pick<BookingModalProps, "onClose">) {
+  const router = useRouter();
   const [values, setValues] = useState<BookingFormValues>(initialValues);
   const [errors, setErrors] = useState<BookingFormErrors>({});
   const [submitted, setSubmitted] = useState(false);
@@ -37,10 +47,6 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
   }, []);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
@@ -55,19 +61,7 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) {
-      setValues(initialValues);
-      setErrors({});
-      setSubmitted(false);
-    }
-  }, [open]);
-
-  if (!open) {
-    return null;
-  }
+  }, [onClose]);
 
   function handleInputChange(field: keyof BookingFormValues, value: string) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -87,8 +81,10 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
       return;
     }
 
-    onBooked(values.fullName.trim());
+    saveBookingDraft({ service: values.service, location: values.location.trim(), pickupDate: values.pickupDate });
     onClose();
+    // Signed-out visitors are sent to login first and come back to the form afterwards.
+    router.push("/new-order");
   }
 
   function renderError(field: keyof BookingFormValues) {
@@ -111,7 +107,7 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 id="booking-title" className="text-lg font-semibold text-slate-900">Book a pickup</h2>
-            <p className="text-xs text-slate-500">We&apos;ll confirm your slot by SMS.</p>
+            <p className="text-xs text-slate-500">Next, sign in or create a free account. We&apos;ll text you every update.</p>
           </div>
           <button
             className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
@@ -126,34 +122,6 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="fullName">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              className={formControlClass}
-              value={values.fullName}
-              onChange={(event) => handleInputChange("fullName", event.target.value)}
-              placeholder="Jane Wanjiru"
-            />
-            {renderError("fullName")}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="phone">
-              Phone Number
-            </label>
-            <input
-              id="phone"
-              className={formControlClass}
-              value={values.phone}
-              onChange={(event) => handleInputChange("phone", event.target.value)}
-              placeholder="+2547XXXXXXXX"
-            />
-            {renderError("phone")}
-          </div>
-
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="location">
               Pickup Location
@@ -180,8 +148,11 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
                 onChange={(event) => handleInputChange("service", event.target.value)}
               >
                 <option value="">Select...</option>
-                <option value="wash-fold">Wash & Fold</option>
-                <option value="dry-cleaning">Dry Cleaning</option>
+                {serviceItems.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
               {renderError("service")}
             </div>
@@ -206,7 +177,7 @@ export function BookingModal({ open, onClose, onBooked }: BookingModalProps) {
             className={`${submitButtonClass} mt-2`}
             type="submit"
           >
-            Confirm Pickup
+            Continue
           </button>
         </form>
       </div>

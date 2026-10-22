@@ -1,4 +1,5 @@
 const { SELF_SIGNUP_ROLES } = require('../utils/roles');
+const { normalizePhone } = require('../utils/mpesa');
 
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const phoneRegex = /^\+?[1-9]\d{1,14}$/;
@@ -8,13 +9,22 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 // Emails are stored and looked up in lower case: PostgreSQL compares text case-sensitively.
 const normalizeEmail = (email) => (typeof email === 'string' ? email.trim().toLowerCase() : email);
 
+// Kenyan mobiles in any common form (0712 345 678, 254712..., +254 712...) are stored as
+// +2547XXXXXXXX so SMS and M-Pesa can reach them; other numbers must already be international.
+const normalizeSignupPhone = (phone) => {
+  const kenyan = normalizePhone(phone);
+  if (kenyan) return `+${kenyan}`;
+  const compact = String(phone ?? '').replace(/[\s()-]/g, '');
+  return phoneRegex.test(compact) && compact.startsWith('+') ? compact : null;
+};
+
 const validateEmailAndPhone = (email, phone) => {
   if (!emailRegex.test(email)) {
     throw new Error('Invalid email format');
   }
 
-  if (phone && !phoneRegex.test(phone)) {
-    throw new Error('Invalid phone number format');
+  if (phone && !normalizeSignupPhone(phone)) {
+    throw new Error('Enter a valid mobile number, e.g. 0712 345 678');
   }
 };
 
@@ -64,7 +74,7 @@ const validateSignupRequest = (req, res, next) => {
       fullName: normalizedFullName,
       email,
       password,
-      phone,
+      phone: normalizeSignupPhone(phone),
       role,
     };
 

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { BackIcon, ClockIcon, MailIcon, OrdersIcon, ServiceIcon, StarRingIcon } from "@/components/mobile/icons";
+import { useEffect, useState } from "react";
+import { BackIcon, ClockIcon, MailIcon, OrdersIcon, ServiceIcon, SupportIcon } from "@/components/mobile/icons";
 import { AppShell, PageHeading, SoftCard } from "@/components/mobile/primitives";
+import { SmsPreferencesCard } from "@/components/mobile/SmsPreferencesCard";
 import { UserAvatar, displayName } from "@/components/mobile/SessionUser";
 import { useSession } from "@/hooks/useSession";
-import type { NavKind } from "@/components/mobile/nav";
+import { homeHrefForNav, navForRole } from "@/components/mobile/nav";
+import { fetchMyOrders, type ApiOrder } from "@/utils/ordersApi";
 import { logout } from "@/utils/session";
 
 // Shortcuts on the profile page; only customers have ordering pages.
@@ -15,7 +17,7 @@ const customerLinks = [
   { label: "My orders", detail: "Track active and past orders", href: "/order-tracking", icon: <OrdersIcon className="h-5 w-5" /> },
   { label: "New order", detail: "Book a pickup for your laundry", href: "/new-order", icon: <ServiceIcon className="h-5 w-5" /> },
   { label: "Reschedule pickup", detail: "Change your next pickup window", href: "/reschedule", icon: <ClockIcon className="h-5 w-5" /> },
-  { label: "Help & support", detail: "Talk to our support team", href: "/support", icon: <StarRingIcon className="h-5 w-5" /> },
+  { label: "Help & support", detail: "Talk to our support team", href: "/support", icon: <SupportIcon className="h-5 w-5" /> },
 ];
 
 export function ProfileScreen() {
@@ -23,8 +25,16 @@ export function ProfileScreen() {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const role = session?.role;
-  const nav: NavKind = role === "rider" ? "rider" : role === "admin" ? "admin" : role === "staff" ? "shop" : "customer";
+  const nav = navForRole(role);
   const isCustomer = nav === "customer";
+  const [orders, setOrders] = useState<ApiOrder[] | null>(null);
+
+  useEffect(() => {
+    if (role === "customer") fetchMyOrders().then(setOrders, () => undefined);
+  }, [role]);
+
+  const activeCount = orders?.filter((order) => !["delivered", "cancelled"].includes(order.status)).length;
+  const deliveredCount = orders?.filter((order) => order.status === "delivered").length;
   const links = isCustomer ? customerLinks : customerLinks.filter((link) => link.href === "/support");
 
   async function handleLogout() {
@@ -34,7 +44,7 @@ export function ProfileScreen() {
   }
 
   return (
-    <AppShell active="profile" nav={nav} homeHref={nav === "rider" ? "/rider" : nav === "shop" || nav === "admin" ? "/shop" : undefined}>
+    <AppShell active="profile" nav={nav} homeHref={isCustomer ? undefined : homeHrefForNav(nav)}>
       <PageHeading title="Profile" subtitle="Manage your account and preferences." />
 
       <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
@@ -53,18 +63,19 @@ export function ProfileScreen() {
           {isCustomer ? (
             <div className="ml-auto grid shrink-0 grid-cols-2 gap-2 text-center lg:ml-0 lg:w-full">
               <div className="rounded-xl bg-slate-50 px-3 py-2">
-                <p className="text-base font-semibold">2</p>
+                <p className="text-base font-semibold">{activeCount ?? "–"}</p>
                 <p className="text-[11px] text-slate-500">Active</p>
               </div>
               <div className="rounded-xl bg-emerald-50 px-3 py-2">
-                <p className="text-base font-semibold text-emerald-800">450</p>
-                <p className="text-[11px] text-emerald-700">Points</p>
+                <p className="text-base font-semibold text-emerald-800">{deliveredCount ?? "–"}</p>
+                <p className="text-[11px] text-emerald-700">Delivered</p>
               </div>
             </div>
           ) : null}
         </SoftCard>
 
         <div className="space-y-4">
+          {isCustomer ? <SmsPreferencesCard /> : null}
           <SoftCard padding="p-0" className="overflow-hidden">
             <ul className="divide-y divide-slate-100">
               {links.map((link) => (

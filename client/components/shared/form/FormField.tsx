@@ -36,8 +36,9 @@ export function FormField({ htmlFor, label, info, error, children, placeholder }
   );
 }
 
-export function FormStatusMessage({ message }: { message: string }) {
-  const isError = /(failed|required|invalid|error)/i.test(message);
+/** Pass `tone` when known; otherwise it's guessed from the wording. */
+export function FormStatusMessage({ message, tone }: { message: string; tone?: "error" | "success" }) {
+  const isError = tone ? tone === "error" : /(failed|required|invalid|error)/i.test(message);
   return (
     <p
       className={`rounded-xl border px-3 py-2 text-sm font-medium ${

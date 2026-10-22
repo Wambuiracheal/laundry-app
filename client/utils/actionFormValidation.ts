@@ -24,7 +24,8 @@ export type CancellationValues = {
 export type FormErrors<T> = Partial<Record<keyof T, string>>;
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const orderIdRegex = /^#?PL-\d{3,6}$/i;
+// Order references are the first 6 hex characters of the order id, e.g. PL-3F2A9C.
+const orderIdRegex = /^#?PL-[0-9A-F]{3,6}$/i;
 
 function isBlank(value: string): boolean {
   return value.trim().length === 0;
@@ -95,8 +96,8 @@ export function validateCancellationForm(values: CancellationValues): FormErrors
     errors.reason = "Select a reason.";
   }
 
-  if (values.details.trim().length < 8) {
-    errors.details = "Please share at least 8 characters.";
+  if (values.details.trim().length > 1000) {
+    errors.details = "Keep this under 1000 characters.";
   }
 
   if (!values.acknowledge) {

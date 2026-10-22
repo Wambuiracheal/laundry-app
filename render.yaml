@@ -58,3 +58,11 @@ services:
         sync: false
       - key: FIREBASE_STORAGE_BUCKET
         sync: false
+      # Customer SMS updates via Africa's Talking (optional; updates still show in the app).
+      # AT_USERNAME=sandbox sends to the Africa's Talking simulator instead of real phones.
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false

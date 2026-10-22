@@ -1,15 +1,11 @@
-import { CancellationForm } from "@/components/shared/CancellationForm";
+import { Suspense } from "react";
+import { CancelOrderScreen } from "@/components/mobile/screens/CancelOrderScreen";
 
-export default function CancelOrderPage() {
+export default function Page() {
+  // The screen reads `?id=` via useSearchParams, which needs a Suspense boundary.
   return (
-    <CancellationForm
-      eyebrow="Order"
-      title="Cancel Order"
-      description="Share your cancellation reason so we can improve your experience."
-      backHref="/order-tracking"
-      backLabel="Back to Order Tracking"
-      successMessage="Order cancellation request submitted."
-      endpoint="/api/actions/cancel-order"
-    />
+    <Suspense>
+      <CancelOrderScreen />
+    </Suspense>
   );
 }

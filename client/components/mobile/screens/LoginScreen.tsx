@@ -13,7 +13,7 @@ import {
 } from "@/components/shared/form/FormField";
 import { getGoogleLoginUrl, login } from "@/utils/authApi";
 import { hasLoginErrors, type LoginErrors, type LoginValues, validateLogin } from "@/utils/loginValidation";
-import { postLoginPath, saveSession } from "@/utils/session";
+import { postLoginPath, saveSession, withCurrentNext } from "@/utils/session";
 
 const initialValues: LoginValues = {
     email: "",
@@ -169,7 +169,14 @@ export function LoginScreen() {
 
                 <p className="pt-2 text-center text-sm text-slate-500">
                     Don&apos;t have an account?{" "}
-                    <Link href="/register" className="font-semibold text-blue-700 hover:text-blue-800">
+                    <Link
+                        href="/register"
+                        onClick={(event) => {
+                            event.preventDefault();
+                            router.push(withCurrentNext("/register"));
+                        }}
+                        className="font-semibold text-blue-700 hover:text-blue-800"
+                    >
                         Sign up
                     </Link>
                 </p>

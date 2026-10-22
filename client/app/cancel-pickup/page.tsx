@@ -1,15 +1,11 @@
-import { CancellationForm } from "@/components/shared/CancellationForm";
+import { Suspense } from "react";
+import { CancelOrderScreen } from "@/components/mobile/screens/CancelOrderScreen";
 
-export default function CancelPickupPage() {
+export default function Page() {
+  // The screen reads `?id=` via useSearchParams, which needs a Suspense boundary.
   return (
-    <CancellationForm
-      eyebrow="Pickup"
-      title="Cancel Pickup"
-      description="Tell us why you need to cancel this pickup."
-      backHref="/dark-dashboard"
-      backLabel="Back to Dark Dashboard"
-      successMessage="Pickup cancellation request received."
-      endpoint="/api/actions/cancel-pickup"
-    />
+    <Suspense>
+      <CancelOrderScreen />
+    </Suspense>
   );
 }

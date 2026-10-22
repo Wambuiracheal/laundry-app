@@ -11,6 +11,7 @@ import { FormField, FormStatusMessage, formControlClass, formSelectClass, formTe
 import type { AddressSuggestion } from "@/utils/addressSearch";
 import { fetchDeliveryQuote, fetchServices, rateLabel, requestOrder, type ApiService, type DeliveryQuote } from "@/utils/ordersApi";
 import { formatKES } from "@/utils/currency";
+import { takeBookingDraft } from "@/utils/bookingDraft";
 import { PICKUP_WINDOWS, pickupDateTime, validateNewOrder, type NewOrderErrors, type NewOrderValues } from "@/utils/newOrderValidation";
 
 const steps = ["Request pickup", "We weigh at the shop", "Pay final price"];
@@ -51,8 +52,22 @@ export function NewOrderScreen() {
   const [quote, setQuote] = useState<{ forId: string; value: DeliveryQuote | null; loading: boolean } | null>(null);
 
   useEffect(() => {
+    // Read before the request so a Strict Mode double effect only applies the draft once.
+    const draft = takeBookingDraft();
     fetchServices()
-      .then(setServices)
+      .then((loaded) => {
+        setServices(loaded);
+        if (!draft) return;
+        // Carry over what the visitor picked on the landing page. The address still has to be
+        // chosen from the suggestions so it can be pinned on the map.
+        const service = loaded.find((candidate) => candidate.name.toLowerCase() === draft.service.toLowerCase());
+        setValues((prev) => ({
+          ...prev,
+          serviceIds: service ? [service.id] : prev.serviceIds,
+          pickupAddress: draft.location || prev.pickupAddress,
+          pickupDate: draft.pickupDate >= todayInputValue() ? draft.pickupDate : prev.pickupDate,
+        }));
+      })
       .catch((error: unknown) => setLoadError(error instanceof Error ? error.message : "Could not load services."));
   }, []);
 
@@ -297,7 +312,7 @@ export function NewOrderScreen() {
           </section>
         </div>
 
-        <aside className="mt-6 lg:sticky lg:top-24 lg:mt-0">
+        <aside className="mt-6 lg:sticky lg:top-8 lg:mt-0">
           <SoftCard padding="p-5">
             <h2 className="text-base font-semibold">Summary</h2>
             {selectedServices.length === 0 ? (
@@ -334,7 +349,7 @@ export function NewOrderScreen() {
               <p>
                 When your clothes reach the shop we weigh them (or count items like suits and shoes). Your total is the
                 laundry plus pickup & delivery, and updates on the order page as soon as that&apos;s done. You pay before
-                your clean clothes leave the shop.
+                your clean clothes leave the shop. We&apos;ll text you at every step.
               </p>
             </div>
 

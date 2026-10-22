@@ -21,6 +21,7 @@ const CUSTOMER_PAGES = [
   "/dark-dashboard",
   "/new-order",
   "/order-tracking",
+  "/notifications",
   "/cancel-order",
   "/cancel-pickup",
   "/reschedule",

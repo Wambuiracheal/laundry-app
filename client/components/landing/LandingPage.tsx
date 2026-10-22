@@ -46,10 +46,8 @@ const secondaryCta =
 
 export function LandingPage() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function openBookingModal() {
-    setSuccessMessage(null);
     setIsBookingOpen(true);
   }
 
@@ -107,9 +105,6 @@ export function LandingPage() {
                   Book a pickup
                 </button>
               </div>
-              {successMessage ? (
-                <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">{successMessage}</p>
-              ) : null}
               <dl className="mt-8 grid max-w-md grid-cols-3 gap-4 border-t border-slate-200 pt-6">
                 {stats.map((stat) => (
                   <div key={stat.label}>
@@ -321,7 +316,6 @@ export function LandingPage() {
       <BookingModal
         open={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
-        onBooked={(name) => setSuccessMessage(`Pickup requested for ${name}. We'll be in touch to confirm.`)}
       />
     </>
   );

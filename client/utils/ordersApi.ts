@@ -132,6 +132,19 @@ export function fetchMyOrders() {
   return authRequest<ApiOrder[]>("/api/orders/mine");
 }
 
+/** Customers can change or cancel a pickup until the rider has collected the clothes. */
+export function canChangePickup(order: Pick<ApiOrder, "status">) {
+  return order.status === "pending_pickup";
+}
+
+export function rescheduleOrder(orderId: string, pickupTime: string) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/reschedule`, { method: "PATCH", body: { pickup_time: pickupTime } });
+}
+
+export function cancelOrder(orderId: string, payload: { reason: string; details: string }) {
+  return authRequest<ApiOrder>(`/api/orders/${orderId}/cancel`, { method: "PATCH", body: payload });
+}
+
 export function fetchOrderQueue() {
   return authRequest<ApiOrder[]>("/api/orders/queue");
 }

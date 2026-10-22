@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middlewares/auth');
 const { ROLES, SHOP_ROLES } = require('../utils/roles');
 const { publishEvent } = require('../utils/redis');
 const { refreshPaymentState } = require('../utils/paymentState');
+const { notifyCustomer } = require('../utils/customerNotifications');
 const { isOrderPriced } = require('../utils/deliveryFee');
 const { MpesaError, isMpesaConfigured, normalizePhone, stkPush, queryStkStatus, parseCallback } = require('../utils/mpesa');
 
@@ -47,19 +48,23 @@ const notifyPaymentUpdated = (payment) =>
 async function applyResult(paymentId, { state, code, desc, receipt = null }) {
   if (state === 'pending') return;
 
-  await prisma.$transaction(async (tx) => {
+  const paid = await prisma.$transaction(async (tx) => {
     const { count } = await tx.payment.updateMany({
       where: { id: paymentId, status: 'pending' },
       data: { status: state, result_code: code, result_desc: desc?.slice(0, 191) ?? null, mpesa_receipt: receipt },
     });
-    if (count === 0 || state !== 'success') return;
+    if (count === 0 || state !== 'success') return null;
 
     const payment = await tx.payment.findUnique({ where: { id: paymentId } });
     await tx.transaction.create({
       data: { payment_id: payment.id, mpesa_ref_no: receipt, amount: payment.amount, type: 'credit' },
     });
     await refreshPaymentState(tx, payment.order_id);
+    return payment;
   });
+
+  // After the commit, so the text quotes the updated balance.
+  if (paid) void notifyCustomer(paid.order_id, 'payment_received', { amount: paid.amount });
 }
 
 /** For a pending payment, asks Daraja how it ended (throttled), then returns the fresh row. */

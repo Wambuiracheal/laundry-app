@@ -19,8 +19,8 @@ import {
     type RegisterValues,
     validateRegister,
 } from "@/utils/registerValidation";
-import { homeForRole, type SignupRole } from "@/utils/roles";
-import { saveSession } from "@/utils/session";
+import { type SignupRole } from "@/utils/roles";
+import { currentNextParam, postLoginPath, saveSession, withCurrentNext } from "@/utils/session";
 
 const initialValues: RegisterValues = {
     fullName: "",
@@ -87,7 +87,8 @@ export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
                 role: result.user?.role,
             });
             setStatus("Account created. Redirecting...");
-            router.replace(homeForRole(result.user?.role ?? role));
+            // Back to the page that sent them here (e.g. booking a pickup), if their role may open it.
+            router.replace(postLoginPath(currentNextParam(), result.user?.role ?? role));
             setValues(initialValues);
             setErrors({});
         } catch (error) {
@@ -214,7 +215,14 @@ export function RegisterScreen({ role = "customer" }: { role?: SignupRole }) {
 
                 <p className="pt-2 text-center text-sm text-slate-500">
                     Already have an account?{" "}
-                    <Link href="/login" className="font-semibold text-blue-700 hover:text-blue-800">
+                    <Link
+                        href="/login"
+                        onClick={(event) => {
+                            event.preventDefault();
+                            router.push(withCurrentNext("/login"));
+                        }}
+                        className="font-semibold text-blue-700 hover:text-blue-800"
+                    >
                         Log in
                     </Link>
                 </p>

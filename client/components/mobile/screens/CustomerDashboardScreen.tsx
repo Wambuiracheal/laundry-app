@@ -18,6 +18,7 @@ import {
   orderTotalLabel,
   serviceSummary,
 } from "@/utils/ordersApi";
+import { NOTIFICATION_POLL_INTERVAL_MS, NOTIFICATION_TITLES, fetchNotifications, notificationText } from "@/utils/notificationsApi";
 
 const popularServices = serviceItems.filter((item) => ["wash-fold", "dry-clean", "iron-only", "shoes"].includes(item.id));
 
@@ -29,6 +30,8 @@ export function CustomerDashboardScreen() {
     .filter((order) => order.status === "pending_pickup" && order.pickup_time)
     .sort((a, b) => (a.pickup_time ?? "").localeCompare(b.pickup_time ?? ""))[0];
   const recentOrders = (orders ?? []).slice(0, 3);
+  const { data: feed } = usePolledData(fetchNotifications, NOTIFICATION_POLL_INTERVAL_MS);
+  const latestUpdate = feed?.notifications[0];
 
   return (
     <AppShell active="home">
@@ -60,11 +63,17 @@ export function CustomerDashboardScreen() {
           <p className="mt-1 text-xl font-semibold text-slate-900 lg:text-2xl">{orders ? activeOrders.length : "–"}</p>
           <p className="text-xs text-blue-700">{awaitingWeighing > 0 ? `${awaitingWeighing} awaiting weighing` : "ongoing"}</p>
         </SoftCard>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 lg:p-5">
-          <p className="text-xs font-medium text-emerald-800">Panda points</p>
-          <p className="mt-1 text-xl font-semibold text-emerald-900 lg:text-2xl">450</p>
-          <p className="text-xs text-emerald-700">pts available</p>
-        </div>
+        <Link href="/notifications" className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-4 transition hover:border-emerald-300 lg:p-5">
+          <p className="text-xs font-medium text-emerald-800">Latest update</p>
+          {latestUpdate ? (
+            <>
+              <p className="mt-1 text-sm font-semibold text-emerald-900">{NOTIFICATION_TITLES[latestUpdate.event] ?? "Update"}</p>
+              <p className="line-clamp-2 text-xs text-emerald-700">{notificationText(latestUpdate)}</p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-emerald-700">We&apos;ll post order updates here and text them to you.</p>
+          )}
+        </Link>
       </section>
 
       <Link href="/new-order" className={`${primaryButtonClass} mt-4 w-full sm:hidden`}>

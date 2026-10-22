@@ -30,8 +30,9 @@ export function validateRegister(values: RegisterValues): RegisterErrors {
     errors.phone = "Please enter a valid phone number.";
   }
 
-  if (values.password.length < 8) {
-    errors.password = "Password should be at least 8 characters.";
+  // Same rule the API enforces, so customers find out here rather than after submitting.
+  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(values.password)) {
+    errors.password = "Use at least 8 characters with upper and lower case letters, a number and a symbol.";
   }
 
   if (values.confirmPassword !== values.password) {

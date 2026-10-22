@@ -22,8 +22,27 @@ export function pickupDateTime(values: Pick<NewOrderValues, "pickupDate" | "time
   return new Date(`${values.pickupDate}T${values.timeWindow}:00`);
 }
 
+export type PickupSlot = Pick<NewOrderValues, "pickupDate" | "timeWindow">;
+
+/** A pickup needs a date and a window that hasn't started yet. Shared by booking and rescheduling. */
+export function validatePickupSlot(values: PickupSlot): Partial<Record<keyof PickupSlot, string>> {
+  const errors: Partial<Record<keyof PickupSlot, string>> = {};
+
+  if (!values.pickupDate) {
+    errors.pickupDate = "Pick a date for pickup.";
+  }
+
+  if (!values.timeWindow) {
+    errors.timeWindow = "Choose a pickup window.";
+  } else if (values.pickupDate && pickupDateTime(values) <= new Date()) {
+    errors.timeWindow = "That window has already passed. Choose a later one.";
+  }
+
+  return errors;
+}
+
 export function validateNewOrder(values: NewOrderValues): NewOrderErrors {
-  const errors: NewOrderErrors = {};
+  const errors: NewOrderErrors = { ...validatePickupSlot(values) };
 
   if (values.serviceIds.length === 0) {
     errors.serviceIds = "Choose at least one service.";
@@ -34,16 +53,6 @@ export function validateNewOrder(values: NewOrderValues): NewOrderErrors {
     errors.pickupAddress = "Tell us where to collect your clothes.";
   } else if (address.length > 191) {
     errors.pickupAddress = "Keep the address under 191 characters.";
-  }
-
-  if (!values.pickupDate) {
-    errors.pickupDate = "Pick a date for pickup.";
-  }
-
-  if (!values.timeWindow) {
-    errors.timeWindow = "Choose a pickup window.";
-  } else if (values.pickupDate && pickupDateTime(values) <= new Date()) {
-    errors.timeWindow = "That window has already passed. Choose a later one.";
   }
 
   if (values.houseDetails.trim().length > 191) {

@@ -77,6 +77,17 @@ export async function logout() {
   clearSession();
 }
 
+/** The page a visitor was sent to log in from (`?next=`), read in the browser. */
+export function currentNextParam() {
+  return new URLSearchParams(window.location.search).get("next");
+}
+
+/** `path` with the current `?next=` carried over, so switching between login and signup keeps it. */
+export function withCurrentNext(path: string) {
+  const next = currentNextParam();
+  return next ? `${path}?next=${encodeURIComponent(next)}` : path;
+}
+
 /** Only allow same-site relative paths as a post-login destination. */
 export function safeNextPath(value: string | null, fallback = "/customer-dashboard") {
   return value && value.startsWith("/") && !value.startsWith("//") ? value : fallback;

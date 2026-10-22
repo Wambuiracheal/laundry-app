@@ -8,6 +8,7 @@ const { ROLES, SHOP_ROLES } = require('../utils/roles');
 const { recordTripEarning } = require('../utils/riderEarnings');
 const { quoteDelivery, recalculateOrderTotal, ensureDeliveryFee, isOrderPriced } = require('../utils/deliveryFee');
 const { geocodeAddress } = require('../utils/geocode');
+const { notifyCustomer, notifyStatusChange } = require('../utils/customerNotifications');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -187,9 +188,85 @@ router.post('/request', requireAuth, requireRole(ROLES.CUSTOMER), async (req, re
     });
 
     notifyOrderUpdated(order);
+    // Not awaited: the customer shouldn't wait on the SMS gateway.
+    void notifyCustomer(order.id, 'order_placed');
     res.status(201).json(await presentOrder(order));
   } catch (error) {
     res.status(500).json({ error: 'Failed to create order', details: error.message });
+  }
+});
+
+// Loads one of the signed-in customer's orders that is still waiting to be collected; sends
+// the error response and returns null otherwise.
+async function findOwnPendingOrder(req, res, action) {
+  const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+  if (!order || order.user_id !== req.user.userId) {
+    res.status(404).json({ error: 'Order not found' });
+    return null;
+  }
+  if (order.status !== 'pending_pickup') {
+    res.status(400).json({ error: `Orders can only be ${action} before they are picked up. Contact support for help with this order.` });
+    return null;
+  }
+  return order;
+}
+
+// customer: move the pickup of an order that hasn't been collected yet
+router.patch('/:id/reschedule', requireAuth, requireRole(ROLES.CUSTOMER), async (req, res) => {
+  try {
+    const pickupTime = new Date(req.body.pickup_time);
+    if (Number.isNaN(pickupTime.getTime()) || pickupTime < new Date()) {
+      return res.status(400).json({ error: 'Choose a pickup time in the future' });
+    }
+
+    const existing = await findOwnPendingOrder(req, res, 'rescheduled');
+    if (!existing) return;
+
+    const order = await prisma.order.update({
+      where: { id: existing.id },
+      data: { pickup_time: pickupTime },
+      include: trackedOrderInclude,
+    });
+
+    notifyOrderUpdated(order);
+    void notifyCustomer(order.id, 'rescheduled');
+    res.json(await presentOrder(order));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to reschedule pickup', details: error.message });
+  }
+});
+
+// customer: cancel an order that hasn't been collected yet
+router.patch('/:id/cancel', requireAuth, requireRole(ROLES.CUSTOMER), async (req, res) => {
+  try {
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+    const details = typeof req.body.details === 'string' ? req.body.details.trim() : '';
+    if (!reason || reason.length > 191 || details.length > 1000) {
+      return res.status(400).json({ error: 'Choose a reason (details up to 1000 characters)' });
+    }
+
+    const existing = await findOwnPendingOrder(req, res, 'cancelled');
+    if (!existing) return;
+
+    const [, order] = await prisma.$transaction([
+      prisma.orderStatusHistory.create({ data: { order_id: existing.id, status: 'cancelled', changed_by: ROLES.CUSTOMER } }),
+      // Release the pickup so it drops off the assigned rider's job list.
+      prisma.order.update({
+        where: { id: existing.id },
+        data: { status: 'cancelled', assigned_rider_id: null },
+        include: trackedOrderInclude,
+      }),
+      // Kept for the shop's records of why customers cancel.
+      prisma.cancellationRequest.create({
+        data: { request_type: 'order', reason, details: `Order ${existing.id}${details ? `: ${details}` : ''}`, acknowledged: true },
+      }),
+    ]);
+
+    notifyOrderUpdated(order);
+    void notifyCustomer(order.id, 'cancelled');
+    res.json(await presentOrder(order));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel order', details: error.message });
   }
 });
 
@@ -414,6 +491,7 @@ router.patch('/:id/measure', requireAuth, requireRole(...SHOP_ROLES), async (req
     });
 
     notifyOrderUpdated(updated);
+    if (nextStatus !== order.status) void notifyStatusChange(order.id, nextStatus);
     res.json(await presentOrder(updated));
   } catch (error) {
     res.status(500).json({ error: 'Failed to record measurements', details: error.message });
@@ -463,6 +541,7 @@ router.patch('/:id/status', requireAuth, requireRole(...SHOP_ROLES), async (req,
     }
 
     notifyOrderUpdated(order);
+    void notifyStatusChange(order.id, status);
     res.json(await presentOrder(order));
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order status', details: error.message });
@@ -543,6 +622,7 @@ router.patch('/:id/rider-status', requireAuth, requireRole(ROLES.RIDER), async (
     }
 
     notifyOrderUpdated(order);
+    void notifyStatusChange(order.id, status);
     res.json(order);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update job', details: error.message });

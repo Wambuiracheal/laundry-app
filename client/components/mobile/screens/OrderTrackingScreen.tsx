@@ -16,6 +16,7 @@ import {
   ORDER_POLL_INTERVAL_MS,
   STATUS_LABELS,
   STATUS_TONES,
+  canChangePickup,
   fetchMyOrders,
   formatDateTime,
   isMeasured,
@@ -238,14 +239,26 @@ export function OrderTrackingScreen() {
                 </SoftCard>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/support" className={primaryButtonClass}>
-                  Contact Support
+              {canChangePickup(order) ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Link href={`/reschedule?id=${order.id}`} className={primaryButtonClass}>
+                    Reschedule pickup
+                  </Link>
+                  <Link href={`/support?order=${encodeURIComponent(orderRef(order))}`} className={secondaryButtonClass}>
+                    Contact support
+                  </Link>
+                  <Link
+                    href={`/cancel-order?id=${order.id}`}
+                    className={`${secondaryButtonClass} !border-rose-200 !text-rose-700 hover:!bg-rose-50`}
+                  >
+                    Cancel order
+                  </Link>
+                </div>
+              ) : (
+                <Link href={`/support?order=${encodeURIComponent(orderRef(order))}`} className={`${secondaryButtonClass} w-full`}>
+                  Contact support
                 </Link>
-                <Link href="/cancel-order" className={secondaryButtonClass}>
-                  Cancel Order
-                </Link>
-              </div>
+              )}
             </div>
 
             <div className="space-y-4 lg:self-start">
